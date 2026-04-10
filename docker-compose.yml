@@ -1,43 +1,76 @@
 version: '3.8'
 
 services:
-  # 1. Database lưu trữ
+  # 1. Database lưu trữ - Elasticsearch
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:7.17.10
     environment:
       - discovery.type=single-node
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - xpack.security.enabled=false
     ports:
       - "9200:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\"\\|\"status\":\"yellow\"'"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
-  # 2. Giao diện quản lý
+  # 2. Giao diện quản lý - Kibana
   kibana:
     image: docker.elastic.co/kibana/kibana:7.17.10
     ports:
       - "5601:5601"
     depends_on:
-      - elasticsearch
+      elasticsearch:
+        condition: service_healthy
 
-  # 3. Message Queue
+  # 3. Message Queue - Redis
   redis:
     image: redis:latest
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
 
-  # 4. Bộ xử lý log
+  # 4. Bộ xử lý log - Logstash
   logstash:
     image: docker.elastic.co/logstash/logstash:7.17.10
     volumes:
       - ./logstash/pipeline:/usr/share/logstash/pipeline
     depends_on:
-      - elasticsearch
-      - redis
+      elasticsearch:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
-  # 5. API nhận log
+  # 5. API nhận & truy vấn log
   api-collector:
     build: ./api
-    command: uvicorn main:app --host 0.0.0.0 --port 8000
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
     ports:
       - "8000:8000"
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # 6. Dashboard visualization
+  dashboard:
+    build: ./dashboard
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api-collector
+    restart: unless-stopped
+
+volumes:
+  es_data:
+    driver: local
