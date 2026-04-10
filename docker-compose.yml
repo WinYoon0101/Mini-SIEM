@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  # 1. Database lưu trữ
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.10
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+
+  # 2. Giao diện quản lý
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.17.10
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+
+  # 3. Message Queue
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+
+  # 4. Bộ xử lý log
+  logstash:
+    image: docker.elastic.co/logstash/logstash:7.17.10
+    volumes:
+      - ./logstash/pipeline:/usr/share/logstash/pipeline
+    depends_on:
+      - elasticsearch
+      - redis
+
+  # 5. API nhận log
+  api-collector:
+    build: ./api
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
