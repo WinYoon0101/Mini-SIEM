@@ -1,0 +1,120 @@
+{
+  "index_patterns": ["siem-logs-*"],
+  "priority": 500,
+  "version": 1,
+  "_meta": {
+    "description": "Mini SIEM — mapping cho chỉ mục log bảo mật (Collector API + Logstash → Elasticsearch 7.x)"
+  },
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0,
+      "refresh_interval": "5s"
+    },
+    "mappings": {
+      "properties": {
+        "@timestamp": {
+          "type": "date"
+        },
+        "timestamp": {
+          "type": "date",
+          "ignore_malformed": true
+        },
+        "ingested_at": {
+          "type": "date",
+          "ignore_malformed": true
+        },
+        "event_type": {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        },
+        "src_ip": {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        },
+        "dest_ip": {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        },
+        "source": {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        },
+        "log_source": {
+          "type": "keyword",
+          "ignore_above": 256
+        },
+        "severity": {
+          "type": "integer"
+        },
+        "severity_label": {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 64
+            }
+          }
+        },
+        "message": {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        },
+        "log_message": {
+          "type": "text"
+        },
+        "is_attack": {
+          "type": "boolean"
+        },
+        "attack_patterns": {
+          "type": "keyword",
+          "ignore_above": 128
+        },
+        "port": {
+          "type": "integer"
+        },
+        "protocol": {
+          "type": "keyword",
+          "ignore_above": 32
+        },
+        "action": {
+          "type": "keyword",
+          "ignore_above": 32
+        },
+        "user": {
+          "type": "keyword",
+          "ignore_above": 256
+        },
+        "username": {
+          "type": "keyword",
+          "ignore_above": 256
+        }
+      }
+    }
+  }
+}

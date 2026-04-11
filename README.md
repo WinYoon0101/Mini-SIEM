@@ -2,6 +2,8 @@
 
 Hệ thống thu thập, phân tích và trực quan hóa log bảo mật từ nhiều nguồn.
 
+**Tài liệu thiết kế (báo cáo / hội đồng):** [docs/THIET_KE_HE_THONG.md](docs/THIET_KE_HE_THONG.md) — kiến trúc, luồng dữ liệu, lược đồ & **chiến lược chỉ mục**, scale-out.
+
 ## 🏗️ Kiến trúc
 
 ```
@@ -38,11 +40,14 @@ Hệ thống thu thập, phân tích và trực quan hóa log bảo mật từ n
 ## 🚀 Khởi chạy nhanh
 
 ```bash
-# 1. Build và start
+# 1. Build và start (es-bootstrap nạp Index Template siem-logs trước khi Logstash/API tạo index)
 docker-compose up -d --build
 
 # 2. Đợi ES sẵn sàng (30-60 giây)
 curl http://localhost:9200/_cluster/health
+
+# (Tuỳ chọn) Xác nhận template đã áp dụng
+curl -s "http://localhost:9200/_index_template/siem-logs?pretty"
 
 # 3. Seed dữ liệu test
 pip install requests
@@ -88,10 +93,21 @@ python stress_test.py 1000000 5000 8
 # Params: [total_entries] [batch_size] [workers]
 ```
 
+### Benchmark độ trễ truy vấn (p50 / p95 / p99)
+```bash
+python benchmark_query_latency.py -n 100 -w 5
+# Sau khi đã có nhiều log index, tùy chọn: --min-docs 1000000
+```
+
 ## 📁 Cấu trúc dự án
 
 ```
 mini-siem/
+├── docs/
+│   └── THIET_KE_HE_THONG.md # Thiết kế hệ thống + indexing + scale-out
+├── elasticsearch/
+│   └── index-templates/
+│       └── siem-logs-template.json  # Mapping & settings cho siem-logs-*
 ├── api/
 │   ├── main.py              # FastAPI application
 │   ├── requirements.txt     # Python dependencies
@@ -106,7 +122,8 @@ mini-siem/
 │   └── pipeline/
 │       └── logstash.conf    # Log processing pipeline
 ├── docker-compose.yml       # All services
-├── stress_test.py           # Performance benchmark
+├── stress_test.py              # Benchmark throughput ingest
+├── benchmark_query_latency.py  # p50/p95/p99 cho /search, /stats, …
 ├── seed_data.py             # Sample data generator
 ├── TEST_GUIDE.md            # Testing guide
 └── README.md
@@ -117,6 +134,6 @@ mini-siem/
 - **API**: Python FastAPI + Uvicorn (4 workers)
 - **Queue**: Redis (message broker)
 - **Pipeline**: Logstash (log processing + enrichment)
-- **Storage**: Elasticsearch 7.17
+- **Storage**: Elasticsearch 7.17 + **Composable Index Template** `siem-logs` (`elasticsearch/index-templates/siem-logs-template.json`, nạp bởi `es-bootstrap` trong Docker Compose)
 - **Dashboard**: HTML/CSS/JS + Chart.js + Nginx
 - **Monitoring**: Kibana (optional)
