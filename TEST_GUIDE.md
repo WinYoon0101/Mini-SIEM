@@ -23,13 +23,19 @@ docker-compose up -d --build
 ```bash
 docker-compose ps
 ```
-**Expected**: 6 services đều ở trạng thái `Up`:
-- `elasticsearch` (port 9200)
-- `kibana` (port 5601)
-- `redis` (port 6379)
-- `logstash`
-- `api-collector` (port 8000)
-- `dashboard` (port 3000)
+**Expected**: Các service chạy ổn định; trong đó có `elasticsearch`, `kibana`, `redis`, `logstash`, `api-collector`, `dashboard`. Service **`es-bootstrap`** chạy một lần rồi **thoát** (exit 0) sau khi `PUT /_index_template/siem-logs` thành công — trạng thái `Exited (0)` là bình thường.
+
+```bash
+docker-compose ps -a
+```
+
+### Bước 2b: Xác nhận Index Template (khuyến nghị)
+
+```bash
+curl -s "http://localhost:9200/_index_template/siem-logs?pretty"
+```
+
+**Expected**: Trong JSON có `"index_patterns": ["siem-logs-*"]` và phần `template.mappings.properties` chứa các trường như `event_type`, `src_ip`, `message`, `attack_patterns`, …
 
 ### Bước 3: Đợi Elasticsearch sẵn sàng (30-60 giây)
 ```bash
@@ -229,6 +235,24 @@ curl -w "\nTotal time: %{time_total}s\n" "http://localhost:8000/stats?interval=1
 - ✅ Query latency < 1s cho aggregation queries
 - ✅ `query_latency_ms` trong response cho thấy ES query time
 
+### 5.5. Benchmark phân vị (p50 / p95 / p99)
+
+Script `benchmark_query_latency.py` lặp lại nhiều kịch bản (`/search` đơn giản, có lọc, full-text, khoảng thời gian + IP, `/stats`, `/recent`) và in **p50, p95, p99** cho:
+
+- **client_ms**: thời gian vòng đời HTTP (gần trải nghiệm người dùng).
+- **server_ms**: `query_latency_ms` từ API (phần truy vấn ES trong backend), với các endpoint có trường này.
+
+```bash
+pip install requests
+# Khuyến nghị chạy sau khi đã index đủ lớn (vd. sau stress 1M):
+python benchmark_query_latency.py --url http://localhost:8000 -n 100 -w 5
+
+# Cảnh báo nếu chưa đủ bản ghi (ví dụ mong đợi ≥ 1M):
+python benchmark_query_latency.py -n 200 --min-docs 1000000
+```
+
+Tham số: `-n` số lần đo mỗi kịch bản, `-w` warmup (bỏ qua khi tính thống kê), `--min-docs` chỉ in cảnh báo.
+
 ---
 
 ## 6. Test Pipeline (Redis → Logstash → ES)
@@ -288,7 +312,8 @@ curl "http://localhost:8000/search?src_ip=10.0.0.99&size=1"
 |---|---------|--------------|---------|
 | 1 | Log collector API | Test POST /ingest, /ingest/batch | ☐ |
 | 2 | Indexing service | Logstash enrichment + ES indexing | ☐ |
-| 3 | Dashboard visualization | Mở http://localhost:3000 | ☐ |
+| 3 | Index template & mapping | `curl .../_index_template/siem-logs` + `docs/THIET_KE_HE_THONG.md` | ☐ |
+| 4 | Dashboard visualization | Mở http://localhost:3000 | ☐ |
 
 ### Đánh giá
 

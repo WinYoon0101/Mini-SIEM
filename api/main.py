@@ -395,7 +395,7 @@ async def get_attack_statistics(
 
                 # Attack patterns
                 "attack_patterns": {
-                    "terms": {"field": "attack_patterns.keyword", "size": 10}
+                    "terms": {"field": "attack_patterns", "size": 10}
                 },
 
                 # Timeline (histogram)

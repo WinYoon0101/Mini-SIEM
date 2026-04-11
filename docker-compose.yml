@@ -1,6 +1,23 @@
-version: '3.8'
-
 services:
+  # 0. Nạp Index Template (Composable) trước khi Logstash/API tạo index siem-logs-*
+  es-bootstrap:
+    image: curlimages/curl:8.5.0
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        echo "[es-bootstrap] Applying index template siem-logs..."
+        curl -sfS -X PUT "http://elasticsearch:9200/_index_template/siem-logs" \
+          -H "Content-Type: application/json" \
+          --data-binary @/template.json
+        echo "[es-bootstrap] Done."
+    volumes:
+      - ./elasticsearch/index-templates/siem-logs-template.json:/template.json:ro
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    restart: "no"
+
   # 1. Database lưu trữ - Elasticsearch
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:7.17.10
@@ -26,6 +43,8 @@ services:
     depends_on:
       elasticsearch:
         condition: service_healthy
+      es-bootstrap:
+        condition: service_completed_successfully
 
   # 3. Message Queue - Redis
   redis:
@@ -46,6 +65,8 @@ services:
     depends_on:
       elasticsearch:
         condition: service_healthy
+      es-bootstrap:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
 
@@ -60,6 +81,8 @@ services:
         condition: service_healthy
       elasticsearch:
         condition: service_healthy
+      es-bootstrap:
+        condition: service_completed_successfully
     restart: unless-stopped
 
   # 6. Dashboard visualization
