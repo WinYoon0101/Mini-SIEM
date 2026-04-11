@@ -118,6 +118,18 @@ def _enrich_log(data: dict) -> dict:
     if any(kw in msg for kw in ["malware", "trojan", "ransomware", "virus"]):
         attack_patterns.append("malware")
 
+    # Sự kiện tấn công theo loại nhưng message không khớp từ khóa heuristic ở trên
+    # (vd. DNS tunneling, chặn C2 không chứa "malware"...) — vẫn cần nhãn cho thống kê/dashboard.
+    if not attack_patterns and data.get("event_type") in (
+        "firewall_block",
+        "ids_alert",
+        "login_failure",
+        "port_scan",
+        "malware_detected",
+        "dos_attack",
+    ):
+        attack_patterns.append(data["event_type"])
+
     data["attack_patterns"] = attack_patterns
     data["is_attack"] = len(attack_patterns) > 0 or data.get("event_type") in [
         "firewall_block", "ids_alert", "login_failure", "port_scan",

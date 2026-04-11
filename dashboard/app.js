@@ -542,6 +542,19 @@ function renderSourcesChart(sourceData) {
 // ─── Chart: Attack Patterns ───
 function renderAttackPatternsChart(patternData) {
     const ctx = document.getElementById('chart-attack-patterns');
+    const emptyHint = document.getElementById('attack-patterns-empty');
+    if (!patternData || patternData.length === 0) {
+        if (state.charts.attackPatterns) {
+            state.charts.attackPatterns.destroy();
+            state.charts.attackPatterns = null;
+        }
+        if (emptyHint) emptyHint.hidden = false;
+        if (ctx) ctx.style.display = 'none';
+        return;
+    }
+    if (emptyHint) emptyHint.hidden = true;
+    if (ctx) ctx.style.display = 'block';
+
     if (state.charts.attackPatterns) state.charts.attackPatterns.destroy();
 
     state.charts.attackPatterns = new Chart(ctx, {
