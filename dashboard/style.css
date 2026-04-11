@@ -520,6 +520,23 @@ body {
     justify-content: center;
 }
 
+.chart-empty-hint {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    margin: 0 auto;
+    padding: 1rem 1.25rem;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    line-height: 1.45;
+    max-width: 18rem;
+    z-index: 1;
+    pointer-events: none;
+}
+
 /* ═══════════════════════════════════════════════════════════════
    Search Panel
    ═══════════════════════════════════════════════════════════════ */
