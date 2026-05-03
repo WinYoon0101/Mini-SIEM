@@ -8,7 +8,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from enum import Enum
-from datetime import datetime, timedelta
+from datetime import datetime
+from elasticsearch import Elasticsearch
 import redis
 import json
 import time
@@ -36,11 +37,13 @@ app.add_middleware(
 # Redis connection
 redis_client = redis.Redis(host='redis', port=6379, db=0, decode_responses=True)
 
-# Elasticsearch connection (lazy import)
-from elasticsearch import Elasticsearch
+# Elasticsearch connection
 es_client = Elasticsearch(["http://elasticsearch:9200"])
 
-# Metrics tracking (in-memory)
+# Index pattern dùng chung cho tất cả ES query
+ES_INDEX_PATTERN = "siem-logs-*"
+
+# Metrics tracking (in-memory) — reset khi API restart; chỉ phục vụ monitoring nội bộ
 _metrics = {
     "total_ingested": 0,
     "total_queries": 0,
@@ -158,9 +161,7 @@ def _push_to_queue(log_data: dict):
     redis_client.lpush("log_queue", json.dumps(log_data))
 
 
-def _get_es_index_pattern():
-    """Trả về pattern index của Elasticsearch"""
-    return "siem-logs-*"
+# ES_INDEX_PATTERN được định nghĩa ở phần Config phía trên
 
 
 # ──────────────────────────── API Endpoints ────────────────────────────
@@ -293,7 +294,7 @@ async def search_logs(
         offset = (page - 1) * size
 
         result = es_client.search(
-            index=_get_es_index_pattern(),
+            index=ES_INDEX_PATTERN,
             body={
                 "query": query_body,
                 "sort": [{sort_by: {"order": sort_order, "unmapped_type": "date"}}],
@@ -441,7 +442,7 @@ async def get_attack_statistics(
         }
 
         result = es_client.search(
-            index=_get_es_index_pattern(),
+            index=ES_INDEX_PATTERN,
             body=body,
             ignore_unavailable=True,
         )
@@ -505,7 +506,7 @@ async def get_recent_logs(
     """Lấy log gần nhất cho live feed trên dashboard."""
     try:
         result = es_client.search(
-            index=_get_es_index_pattern(),
+            index=ES_INDEX_PATTERN,
             body={
                 "query": {"match_all": {}},
                 "sort": [{"timestamp": {"order": "desc", "unmapped_type": "date"}}],
@@ -548,7 +549,7 @@ async def health_check():
 
         # Check index stats
         try:
-            stats = es_client.indices.stats(index=_get_es_index_pattern())
+            stats = es_client.indices.stats(index=ES_INDEX_PATTERN)
             total_docs = stats.get("_all", {}).get("primaries", {}).get("docs", {}).get("count", 0)
             total_size = stats.get("_all", {}).get("primaries", {}).get("store", {}).get("size_in_bytes", 0)
             health["total_indexed_logs"] = total_docs
