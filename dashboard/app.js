@@ -49,6 +49,27 @@ const CHART_PALETTE = [
     COLORS.indigo, COLORS.teal,
 ];
 
+// Chart shared config — tooltip & grid scale dùng chung cho tất cả biểu đồ
+const CHART_TOOLTIP = {
+    backgroundColor: '#1a1f35',
+    borderColor: '#2d3a5c',
+    borderWidth: 1,
+    titleColor: '#e8eaf0',
+    bodyColor: '#8b92a8',
+    padding: 12,
+    cornerRadius: 8,
+};
+
+const CHART_LEGEND_LABELS = {
+    color: '#8b92a8',
+    font: { size: 11, family: 'Inter' },
+    padding: 12,
+    usePointStyle: true,
+};
+
+const CHART_GRID_COLOR = 'rgba(30, 38, 66, 0.5)';
+const CHART_TICK_STYLE = { color: '#5c6380', font: { size: 10 } };
+
 // ═══════════════════════════════════════════════════════════════
 //  Utility Functions
 // ═══════════════════════════════════════════════════════════════
@@ -289,25 +310,14 @@ function renderTimelineChart(timelineData) {
             maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
             plugins: {
-                legend: {
-                    labels: { color: '#8b92a8', font: { size: 11, family: 'Inter' }, padding: 16, usePointStyle: true },
-                },
-                tooltip: {
-                    backgroundColor: '#1a1f35',
-                    borderColor: '#2d3a5c',
-                    borderWidth: 1,
-                    titleColor: '#e8eaf0',
-                    bodyColor: '#8b92a8',
-                    padding: 12,
-                    cornerRadius: 8,
-                },
+                legend: { labels: { ...CHART_LEGEND_LABELS, padding: 16 } },
+                tooltip: CHART_TOOLTIP,
             },
             scales: {
                 x: {
-                    grid: { color: 'rgba(30, 38, 66, 0.5)' },
+                    grid: { color: CHART_GRID_COLOR },
                     ticks: {
-                        color: '#5c6380',
-                        font: { size: 10 },
+                        ...CHART_TICK_STYLE,
                         maxTicksLimit: 10,
                         maxRotation: 0,
                         callback: function(value, index) {
@@ -320,8 +330,8 @@ function renderTimelineChart(timelineData) {
                     },
                 },
                 y: {
-                    grid: { color: 'rgba(30, 38, 66, 0.5)' },
-                    ticks: { color: '#5c6380', font: { size: 10 } },
+                    grid: { color: CHART_GRID_COLOR },
+                    ticks: CHART_TICK_STYLE,
                     beginAtZero: true,
                 },
             },
@@ -350,25 +360,8 @@ function renderEventTypesChart(eventTypes) {
             maintainAspectRatio: false,
             cutout: '65%',
             plugins: {
-                legend: {
-                    position: 'right',
-                    labels: {
-                        color: '#8b92a8',
-                        font: { size: 11, family: 'Inter' },
-                        padding: 12,
-                        usePointStyle: true,
-                        pointStyleWidth: 10,
-                    },
-                },
-                tooltip: {
-                    backgroundColor: '#1a1f35',
-                    borderColor: '#2d3a5c',
-                    borderWidth: 1,
-                    titleColor: '#e8eaf0',
-                    bodyColor: '#8b92a8',
-                    padding: 12,
-                    cornerRadius: 8,
-                },
+                legend: { position: 'right', labels: { ...CHART_LEGEND_LABELS, pointStyleWidth: 10 } },
+                tooltip: CHART_TOOLTIP,
             },
         },
     });
@@ -400,20 +393,12 @@ function renderTopIPsChart(attackers) {
             indexAxis: 'y',
             plugins: {
                 legend: { display: false },
-                tooltip: {
-                    backgroundColor: '#1a1f35',
-                    borderColor: '#2d3a5c',
-                    borderWidth: 1,
-                    titleColor: '#e8eaf0',
-                    bodyColor: '#8b92a8',
-                    padding: 12,
-                    cornerRadius: 8,
-                },
+                tooltip: CHART_TOOLTIP,
             },
             scales: {
                 x: {
-                    grid: { color: 'rgba(30, 38, 66, 0.5)' },
-                    ticks: { color: '#5c6380', font: { size: 10 } },
+                    grid: { color: CHART_GRID_COLOR },
+                    ticks: { ...CHART_TICK_STYLE },
                     beginAtZero: true,
                 },
                 y: {
@@ -467,28 +452,12 @@ function renderSeverityChart(severityData) {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: {
-                    position: 'right',
-                    labels: {
-                        color: '#8b92a8',
-                        font: { size: 11, family: 'Inter' },
-                        padding: 12,
-                        usePointStyle: true,
-                    },
-                },
-                tooltip: {
-                    backgroundColor: '#1a1f35',
-                    borderColor: '#2d3a5c',
-                    borderWidth: 1,
-                    titleColor: '#e8eaf0',
-                    bodyColor: '#8b92a8',
-                    padding: 12,
-                    cornerRadius: 8,
-                },
+                legend: { position: 'right', labels: CHART_LEGEND_LABELS },
+                tooltip: CHART_TOOLTIP,
             },
             scales: {
                 r: {
-                    grid: { color: 'rgba(30, 38, 66, 0.5)' },
+                    grid: { color: CHART_GRID_COLOR },
                     ticks: { display: false },
                 },
             },
@@ -525,15 +494,8 @@ function renderSourcesChart(sourceData) {
             maintainAspectRatio: false,
             cutout: '60%',
             plugins: {
-                legend: {
-                    position: 'right',
-                    labels: {
-                        color: '#8b92a8',
-                        font: { size: 11, family: 'Inter' },
-                        padding: 12,
-                        usePointStyle: true,
-                    },
-                },
+                legend: { position: 'right', labels: CHART_LEGEND_LABELS },
+                tooltip: CHART_TOOLTIP,
             },
         },
     });
@@ -574,17 +536,15 @@ function renderAttackPatternsChart(patternData) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false },
-            },
+            plugins: { legend: { display: false } },
             scales: {
                 x: {
                     grid: { display: false },
-                    ticks: { color: '#5c6380', font: { size: 10 }, maxRotation: 45 },
+                    ticks: { ...CHART_TICK_STYLE, maxRotation: 45 },
                 },
                 y: {
-                    grid: { color: 'rgba(30, 38, 66, 0.5)' },
-                    ticks: { color: '#5c6380', font: { size: 10 } },
+                    grid: { color: CHART_GRID_COLOR },
+                    ticks: CHART_TICK_STYLE,
                     beginAtZero: true,
                 },
             },
@@ -885,6 +845,7 @@ function setStatusBadge(id, status) {
 // ═══════════════════════════════════════════════════════════════
 
 function startAutoRefresh() {
+    stopAutoRefresh();
     state.intervals.autoRefresh = setInterval(() => {
         if (!state.autoRefresh) return;
         if (state.currentTab === 'dashboard') loadDashboard();
@@ -892,17 +853,26 @@ function startAutoRefresh() {
     }, REFRESH_INTERVAL);
 }
 
+function stopAutoRefresh() {
+    if (state.intervals.autoRefresh) {
+        clearInterval(state.intervals.autoRefresh);
+        state.intervals.autoRefresh = null;
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════
 //  Refresh Button
 // ═══════════════════════════════════════════════════════════════
 
 function initRefreshBtn() {
-    const btn = document.getElementById('refresh-btn');
-    btn.addEventListener('click', () => {
-        if (state.currentTab === 'dashboard') loadDashboard();
-        if (state.currentTab === 'search') performSearch();
-        if (state.currentTab === 'livefeed') loadLiveFeed();
-        if (state.currentTab === 'system') loadSystemInfo();
+    const tabLoaders = {
+        dashboard: loadDashboard,
+        search: performSearch,
+        livefeed: loadLiveFeed,
+        system: loadSystemInfo,
+    };
+    document.getElementById('refresh-btn').addEventListener('click', () => {
+        tabLoaders[state.currentTab]?.();
     });
 }
 

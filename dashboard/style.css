@@ -108,7 +108,7 @@ body {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 20px 20px;
+    padding: 20px;
     border-bottom: 1px solid var(--border-color);
 }
 
@@ -514,7 +514,6 @@ body {
 }
 
 .chart-body-doughnut {
-    height: 280px;
     display: flex;
     align-items: center;
     justify-content: center;

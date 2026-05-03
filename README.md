@@ -51,7 +51,7 @@ curl -s "http://localhost:9200/_index_template/siem-logs?pretty"
 
 # 3. Seed dữ liệu test
 pip install requests
-python seed_data.py 100
+python scripts/seed_data.py 100
 
 # 4. Mở Dashboard
 # http://localhost:3000
@@ -89,13 +89,13 @@ Xem chi tiết tại [TEST_GUIDE.md](TEST_GUIDE.md)
 
 ### Stress Test (1M logs)
 ```bash
-python stress_test.py 1000000 5000 8
+python scripts/stress_test.py 1000000 5000 8
 # Params: [total_entries] [batch_size] [workers]
 ```
 
 ### Benchmark độ trễ truy vấn (p50 / p95 / p99)
 ```bash
-python benchmark_query_latency.py -n 100 -w 5
+python scripts/benchmark_query_latency.py -n 100 -w 5
 # Sau khi đã có nhiều log index, tùy chọn: --min-docs 1000000
 ```
 
@@ -104,28 +104,30 @@ python benchmark_query_latency.py -n 100 -w 5
 ```
 mini-siem/
 ├── docs/
-│   └── THIET_KE_HE_THONG.md # Thiết kế hệ thống + indexing + scale-out
+│   └── THIET_KE_HE_THONG.md      # Thiết kế hệ thống + indexing + scale-out
 ├── elasticsearch/
 │   └── index-templates/
 │       └── siem-logs-template.json  # Mapping & settings cho siem-logs-*
 ├── api/
-│   ├── main.py              # FastAPI application
-│   ├── requirements.txt     # Python dependencies
+│   ├── main.py                    # FastAPI application
+│   ├── requirements.txt           # Python dependencies
 │   └── Dockerfile
 ├── dashboard/
-│   ├── index.html           # Dashboard UI
-│   ├── style.css            # Dark theme styling
-│   ├── app.js               # Chart.js + API integration
-│   ├── nginx.conf           # Nginx config
+│   ├── index.html                 # Dashboard UI
+│   ├── style.css                  # Dark theme styling
+│   ├── app.js                     # Chart.js + API integration
+│   ├── nginx.conf                 # Nginx config
 │   └── Dockerfile
 ├── logstash/
 │   └── pipeline/
-│       └── logstash.conf    # Log processing pipeline
-├── docker-compose.yml       # All services
-├── stress_test.py              # Benchmark throughput ingest
-├── benchmark_query_latency.py  # p50/p95/p99 cho /search, /stats, …
-├── seed_data.py             # Sample data generator
-├── TEST_GUIDE.md            # Testing guide
+│       └── logstash.conf          # Log processing pipeline
+├── scripts/
+│   ├── seed_data.py               # Tạo dữ liệu mẫu
+│   ├── stress_test.py             # Benchmark throughput ingest (≥1M logs)
+│   └── benchmark_query_latency.py # p50/p95/p99 cho /search, /stats, …
+├── docker-compose.yml             # Tất cả services
+├── .gitignore
+├── TEST_GUIDE.md                  # Testing guide
 └── README.md
 ```
 
