@@ -955,6 +955,50 @@ body {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   Alerts & Badges
+   ═══════════════════════════════════════════════════════════════ */
+.nav-badge {
+    background: var(--accent-red);
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 10px;
+    margin-left: auto;
+}
+
+.status-badge {
+    display: inline-flex;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+.status-pending { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+.status-investigating { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+.status-resolved { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; }
+.status-badge.ok { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; }
+.status-badge.error { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+.status-badge.unknown { background: rgba(107, 114, 128, 0.15); color: #9ca3af; }
+
+.btn-resolve {
+    padding: 6px 12px;
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--accent-green);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-weight: 600;
+    transition: all var(--transition-fast);
+}
+.btn-resolve:hover {
+    background: var(--accent-green);
+    color: #fff;
+}
+
+/* ═══════════════════════════════════════════════════════════════
    Responsive
    ═══════════════════════════════════════════════════════════════ */
 @media (max-width: 1200px) {

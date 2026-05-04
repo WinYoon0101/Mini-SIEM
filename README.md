@@ -66,6 +66,8 @@ python scripts/seed_data.py 100
 | `GET` | `/search` | Tìm kiếm log với filters |
 | `GET` | `/stats` | Thống kê attack |
 | `GET` | `/recent` | Log gần nhất (live feed) |
+| `GET` | `/alerts` | Lấy danh sách cảnh báo (Alerts) |
+| `PATCH` | `/alerts/{id}` | Cập nhật trạng thái cảnh báo |
 | `GET` | `/health` | Health check |
 | `GET` | `/metrics` | Performance metrics |
 | `GET` | `/docs` | Swagger API documentation |
@@ -79,6 +81,7 @@ python scripts/seed_data.py 100
 - **Severity Distribution**: Polar area chart mức độ nghiêm trọng
 - **Log Sources**: Phân bố nguồn log (web/firewall/ids)
 - **Attack Patterns**: Phân loại kiểu tấn công
+- **Alerts Management**: Bảng theo dõi và xử lý Cảnh báo tự động sinh bởi Correlation Engine
 - **Search**: Tìm kiếm với nhiều bộ lọc + pagination
 - **Live Feed**: Real-time log stream (5s polling)
 - **System**: Health check + performance metrics

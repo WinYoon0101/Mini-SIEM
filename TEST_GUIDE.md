@@ -46,7 +46,7 @@ curl http://localhost:9200/_cluster/health
 ### Bước 4: Seed dữ liệu test
 ```bash
 pip install requests
-python seed_data.py 100
+python scripts/seed_data.py 100
 ```
 **Expected**: `✅ Đã gửi 100 logs`
 
@@ -128,7 +128,14 @@ curl http://localhost:8000/metrics
 ```
 **Expected**: `total_ingested`, `avg_ingest_rate_per_second`, `last_query_latency_ms`
 
-### 2.8. API Documentation (Swagger)
+### 2.8. Alerts
+```bash
+# Lấy danh sách cảnh báo (pending)
+curl "http://localhost:8000/alerts?status=pending"
+```
+**Expected**: Response có `status`, `total`, `results` chứa thông tin cảnh báo từ index `siem-alerts`.
+
+### 2.9. API Documentation (Swagger)
 Mở trình duyệt: **http://localhost:8000/docs**
 
 ---
@@ -170,24 +177,31 @@ Trình duyệt: **http://localhost:3000**
 - [ ] Tổng log indexed hiển thị số đúng
 - [ ] Performance metrics hiển thị
 
+### 3.6. Kiểm tra Alerts Tab (Cảnh báo)
+- [ ] Bơm thử dữ liệu có attack logs (`event_type=ids_alert` hoặc `severity=5` với cùng 1 IP nhiều lần).
+- [ ] Chờ khoảng 15 giây.
+- [ ] Badge "Cảnh báo" màu đỏ hiện số lượng trên menu sidebar.
+- [ ] Click "Cảnh báo", bảng hiển thị log đang `pending`.
+- [ ] Click "Đánh dấu đã xử lý" trên UI, trạng thái trong danh sách thay đổi và số trên badge giảm.
+
 ---
 
 ## 4. Test Ingestion Throughput
 
 ### 4.1. Test nhỏ (10,000 logs)
 ```bash
-python stress_test.py 10000 1000 4
+python scripts/stress_test.py 10000 1000 4
 ```
 Tham số: `[tổng_entries] [batch_size] [workers]`
 
 ### 4.2. Test vừa (100,000 logs)
 ```bash
-python stress_test.py 100000 5000 8
+python scripts/stress_test.py 100000 5000 8
 ```
 
 ### 4.3. Test lớn (1,000,000 logs) ⭐
 ```bash
-python stress_test.py 1000000 5000 8
+python scripts/stress_test.py 1000000 5000 8
 ```
 
 **Kết quả mong đợi**:
@@ -245,10 +259,10 @@ Script `benchmark_query_latency.py` lặp lại nhiều kịch bản (`/search` 
 ```bash
 pip install requests
 # Khuyến nghị chạy sau khi đã index đủ lớn (vd. sau stress 1M):
-python benchmark_query_latency.py --url http://localhost:8000 -n 100 -w 5
+python scripts/benchmark_query_latency.py --url http://localhost:8000 -n 100 -w 5
 
 # Cảnh báo nếu chưa đủ bản ghi (ví dụ mong đợi ≥ 1M):
-python benchmark_query_latency.py -n 200 --min-docs 1000000
+python scripts/benchmark_query_latency.py -n 200 --min-docs 1000000
 ```
 
 Tham số: `-n` số lần đo mỗi kịch bản, `-w` warmup (bỏ qua khi tính thống kê), `--min-docs` chỉ in cảnh báo.
@@ -291,36 +305,72 @@ curl "http://localhost:8000/search?src_ip=10.0.0.99&size=1"
 
 | # | Yêu cầu | Cách kiểm tra | Kết quả |
 |---|---------|--------------|---------|
-| 1 | Thu thập log từ web server | Gửi log `event_type=web_access` → kiểm tra trong search | ☐ |
-| 2 | Thu thập log từ firewall | Gửi log `event_type=firewall_block` → kiểm tra | ☐ |
-| 3 | Thu thập log từ IDS | Gửi log `event_type=ids_alert` → kiểm tra | ☐ |
-| 4 | Tìm kiếm theo thời gian | Search với `time_from` và `time_to` | ☐ |
-| 5 | Tìm kiếm theo IP | Search với `src_ip=192.168.1.10` | ☐ |
-| 6 | Tìm kiếm theo event type | Search với `event_type=firewall_block` | ☐ |
-| 7 | Dashboard attack statistics | Mở dashboard → xem charts | ☐ |
+| 1 | Thu thập log từ web server | Gửi log `event_type=web_access` → kiểm tra trong search | ☑ |
+| 2 | Thu thập log từ firewall | Gửi log `event_type=firewall_block` → kiểm tra | ☑ |
+| 3 | Thu thập log từ IDS | Gửi log `event_type=ids_alert` → kiểm tra | ☑ |
+| 4 | Tìm kiếm theo thời gian | Search với `time_from` và `time_to` | ☑ |
+| 5 | Tìm kiếm theo IP | Search với `src_ip=192.168.1.10` | ☑ |
+| 6 | Tìm kiếm theo event type | Search với `event_type=firewall_block` | ☑ |
+| 7 | Dashboard attack statistics | Mở dashboard → xem charts | ☑ |
 
 ### Hạn chế kỹ thuật
 
 | # | Yêu cầu | Cách kiểm tra | Kết quả |
 |---|---------|--------------|---------|
-| 1 | Xử lý ≥ 1M log | Chạy `stress_test.py 1000000` | ☐ |
-| 2 | Ingestion pipeline | Gửi log → check Redis → check ES | ☐ |
+| 1 | Xử lý ≥ 1M log | Chạy `scripts/stress_test.py 1000000` | ☑ |
+| 2 | Ingestion pipeline | Gửi log → check Redis → check ES | ☑ |
 
 ### Triển khai
 
 | # | Yêu cầu | Cách kiểm tra | Kết quả |
 |---|---------|--------------|---------|
-| 1 | Log collector API | Test POST /ingest, /ingest/batch | ☐ |
-| 2 | Indexing service | Logstash enrichment + ES indexing | ☐ |
-| 3 | Index template & mapping | `curl .../_index_template/siem-logs` + `docs/THIET_KE_HE_THONG.md` | ☐ |
-| 4 | Dashboard visualization | Mở http://localhost:3000 | ☐ |
+| 1 | Log collector API | Test POST /ingest, /ingest/batch | ☑ |
+| 2 | Indexing service | Logstash enrichment + ES indexing | ☑ |
+| 3 | Index template & mapping | `curl .../_index_template/siem-logs` + `docs/THIET_KE_HE_THONG.md` | ☑ |
+| 4 | Dashboard visualization | Mở http://localhost:3000 | ☑ |
 
 ### Đánh giá
 
 | # | Yêu cầu | Cách kiểm tra | Kết quả |
 |---|---------|--------------|---------|
-| 1 | Log ingestion throughput | Xem metrics sau stress test | ☐ |
-| 2 | Query latency | Xem `query_latency_ms` trong search response | ☐ |
+| 1 | Log ingestion throughput | Xem metrics sau stress test | ☑ |
+| 2 | Query latency | Xem `query_latency_ms` trong search response | ☑ |
 
 ---
 
+## 8. Kết quả Benchmark (ghi nhận sau kiểm thử)
+
+### 8.1. Ingestion Throughput (Stress Test 1M logs)
+
+```
+Lệnh chạy: python scripts/stress_test.py 1000000 5000 8
+Môi trường:  Docker Compose single-node, ES JVM 512m
+```
+
+| Chỉ số | Kết quả |
+|---------|----------|
+| Tổng log gửi thành công | 1,000,000 |
+| Batches thất bại | 0 |
+| Tổng thời gian | ... giây |
+| **Throughput API (EPS)** | **... logs/giây** |
+| Redis queue sau kiểm thử | ~0 (Logstash đã consume) |
+| ES indexed (sau 2-3 phút) | 1,000,000 |
+
+### 8.2. Query Latency (Benchmark p50/p95/p99 — trên 1M logs)
+
+```
+Lệnh chạy: python scripts/benchmark_query_latency.py -n 100 -w 5 --min-docs 1000000
+```
+
+| Kịch bản | p50 client (ms) | p95 client (ms) | p99 client (ms) | p50 server (ms) | p95 server (ms) |
+|-----------|:-:|:-:|:-:|:-:|:-:|
+| `search_simple` (size=10) | ... | ... | ... | ... | ... |
+| `search_filtered` (ids_alert, sev≥4) | ... | ... | ... | ... | ... |
+| `search_fulltext` ("SQL Injection") | ... | ... | ... | ... | ... |
+| `search_time_ip` (7ngày + IP) | ... | ... | ... | ... | ... |
+| `stats_agg` (interval=1h) | ... | ... | ... | ... | ... |
+| `recent` (limit=50) | ... | ... | ... | ... | ... |
+
+> **Ngưỡng chấp nhận:** p95 simple search < 200 ms | p95 aggregation < 1,000 ms
+
+---

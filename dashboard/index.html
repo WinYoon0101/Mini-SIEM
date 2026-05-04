@@ -44,6 +44,14 @@
                 </svg>
                 <span>Live Feed</span>
             </a>
+            <a href="#" class="nav-item" data-tab="alerts" id="nav-alerts">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                    <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+                <span>Cảnh báo</span>
+                <span class="nav-badge" id="nav-alert-badge" style="display: none;">0</span>
+            </a>
             <a href="#" class="nav-item" data-tab="system" id="nav-system">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="3"/>
@@ -342,6 +350,59 @@
             </div>
             <div class="livefeed-stream" id="livefeed-stream">
                 <!-- Log entries will be injected here -->
+            </div>
+        </section>
+
+        <!-- ═══ Tab: Alerts ═══ -->
+        <section class="tab-content" id="tab-alerts">
+            <div class="search-panel">
+                <div class="search-filters">
+                    <div class="filter-row">
+                        <div class="filter-group">
+                            <label>Trạng thái</label>
+                            <select id="alert-status-filter" class="filter-select">
+                                <option value="">Tất cả</option>
+                                <option value="pending" selected>Đang chờ xử lý (Pending)</option>
+                                <option value="investigating">Đang điều tra (Investigating)</option>
+                                <option value="resolved">Đã xử lý (Resolved)</option>
+                            </select>
+                        </div>
+                        <div class="filter-group filter-actions">
+                            <button class="btn-search" id="btn-refresh-alerts">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+                                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                                </svg>
+                                Làm mới
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="search-results">
+                    <div class="results-header">
+                        <span id="alerts-count">Đang tải...</span>
+                    </div>
+                    <div class="results-table-wrapper">
+                        <table class="results-table" id="alerts-table">
+                            <thead>
+                                <tr>
+                                    <th>Thời gian</th>
+                                    <th>Trạng thái</th>
+                                    <th>IP Nguồn</th>
+                                    <th>Loại sự kiện</th>
+                                    <th>Mức độ</th>
+                                    <th>Log liên quan</th>
+                                    <th>Mô tả</th>
+                                    <th>Hành động</th>
+                                </tr>
+                            </thead>
+                            <tbody id="alerts-body">
+                                <tr><td colspan="8" class="empty-state">Đang tải cảnh báo...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </section>
 
