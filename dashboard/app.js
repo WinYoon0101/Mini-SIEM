@@ -166,6 +166,7 @@ function initNavigation() {
         dashboard: 'Dashboard',
         search: 'Tìm kiếm Log',
         livefeed: 'Live Feed',
+        alerts: 'Cảnh báo',
         system: 'Hệ thống',
     };
 
@@ -192,6 +193,7 @@ function initNavigation() {
             if (tab === 'dashboard') loadDashboard();
             if (tab === 'system') loadSystemInfo();
             if (tab === 'livefeed') loadLiveFeed();
+            if (tab === 'alerts') loadAlerts();
         });
     });
 
@@ -795,6 +797,109 @@ function stopLiveFeedPolling() {
 }
 
 // ═══════════════════════════════════════════════════════════════
+//  Alerts
+// ═══════════════════════════════════════════════════════════════
+
+function initAlerts() {
+    const btnRefresh = document.getElementById('btn-refresh-alerts');
+    const filterStatus = document.getElementById('alert-status-filter');
+
+    if (btnRefresh) {
+        btnRefresh.addEventListener('click', loadAlerts);
+    }
+    
+    if (filterStatus) {
+        filterStatus.addEventListener('change', loadAlerts);
+    }
+
+    // Auto update alert badge
+    setInterval(updateAlertBadge, 15000);
+    updateAlertBadge();
+}
+
+async function updateAlertBadge() {
+    const data = await apiFetch('/alerts?status=pending&size=1');
+    const badge = document.getElementById('nav-alert-badge');
+    if (badge && data && data.status === 'success') {
+        const count = data.total;
+        badge.textContent = count > 99 ? '99+' : count;
+        badge.style.display = count > 0 ? 'inline-flex' : 'none';
+    }
+}
+
+async function loadAlerts() {
+    const status = document.getElementById('alert-status-filter').value;
+    const countEl = document.getElementById('alerts-count');
+    
+    countEl.textContent = 'Đang tải...';
+    
+    let url = '/alerts?size=50';
+    if (status) {
+        url += `&status=${status}`;
+    }
+
+    const data = await apiFetch(url);
+
+    if (!data || data.status !== 'success') {
+        countEl.textContent = 'Lỗi kết nối API';
+        return;
+    }
+
+    countEl.textContent = `Tìm thấy ${data.total} cảnh báo`;
+    renderAlerts(data.results);
+}
+
+function renderAlerts(alerts) {
+    const tbody = document.getElementById('alerts-body');
+
+    if (!alerts || alerts.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="empty-state">Không có cảnh báo nào</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = alerts.map(alert => {
+        let statusClass = alert.status;
+        let statusText = alert.status.toUpperCase();
+        
+        let actionBtn = '';
+        if (alert.status === 'pending' || alert.status === 'investigating') {
+            actionBtn = `<button class="btn-resolve" onclick="resolveAlert('${alert._id}')">Đánh dấu đã xử lý</button>`;
+        } else {
+            actionBtn = `<span style="color: var(--text-muted);">Đã xử lý</span>`;
+        }
+
+        return `
+            <tr>
+                <td>${formatTimestamp(alert.timestamp)}</td>
+                <td><span class="status-badge status-${statusClass}">${statusText}</span></td>
+                <td><span class="log-ip">${alert.src_ip}</span></td>
+                <td><span class="log-event">${alert.event_type}</span></td>
+                <td><span class="severity-badge severity-${alert.severity === 'high' ? '5' : '3'}">${alert.severity}</span></td>
+                <td>${alert.related_logs}</td>
+                <td>${alert.message}</td>
+                <td>${actionBtn}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+window.resolveAlert = async function(alertId) {
+    if (!confirm('Xác nhận đánh dấu cảnh báo này là đã xử lý?')) return;
+    
+    const res = await apiFetch(`/alerts/${alertId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'resolved' })
+    });
+    
+    if (res && res.status === 'success') {
+        loadAlerts();
+        updateAlertBadge();
+    } else {
+        alert('Lỗi cập nhật cảnh báo');
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
 //  System Info
 // ═══════════════════════════════════════════════════════════════
 
@@ -888,6 +993,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initTimeRange();
     initSearch();
     initLiveFeed();
+    initAlerts();
     initRefreshBtn();
 
     // Initial load

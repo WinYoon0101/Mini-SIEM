@@ -33,11 +33,11 @@ Mục tiêu vận hành tham chiếu:
 
 | Thành phần | Vai trò |
 |------------|---------|
-| **API Collector** | Nhận log (đơn/lô), enrich siêu dữ liệu (mức độ, `is_attack`, pattern), đẩy JSON vào Redis. |
+| **API Collector** | Nhận log, enrich metadata (`is_attack`, pattern), đẩy vào Redis. Chạy **Correlation Engine** ngầm để phát hiện và sinh Cảnh báo (Alerts). |
 | **Redis** | Hàng đợi danh sách (`log_queue`), tách tốc độ ghi API khỏi tốc độ index ES. |
 | **Logstash** | Chuẩn hóa thời gian (`@timestamp`), kiểu dữ liệu, ghi vào ES theo index theo ngày. |
-| **Elasticsearch** | Lưu trữ và tìm kiếm; truy vấn từ API qua HTTP. |
-| **Dashboard** | Giao diện thống kê và tìm kiếm, gọi REST API. |
+| **Elasticsearch** | Lưu trữ và tìm kiếm log (`siem-logs-*`) và cảnh báo (`siem-alerts`). |
+| **Dashboard** | Giao diện thống kê, tìm kiếm, xem Live Feed và Quản lý Cảnh báo (Alerts). |
 
 ---
 
@@ -50,7 +50,8 @@ Mục tiêu vận hành tham chiếu:
 3. **Nạp (queue):** Mỗi bản ghi được `LPUSH` vào Redis key `log_queue` (chuỗi JSON).
 4. **Tiêu thụ:** Logstash đọc từ Redis (`data_type => list`), áp dụng filter (parse `date`, ép kiểu `severity`, v.v.).
 5. **Lưu trữ:** Output Elasticsearch, index `siem-logs-YYYY.MM.DD` (một index mỗi ngày, thuận rollover và dọn dẹp).
-6. **Hiển thị:** Dashboard gọi `GET /stats`, `GET /search`, `GET /recent`; API dựng truy vấn DSL và trả JSON + `query_latency_ms`.
+6. **Tương quan (Correlation):** API chạy Background Task mỗi 15s để gom nhóm log nguy hiểm, sinh ra cảnh báo lưu vào index `siem-alerts`.
+7. **Hiển thị:** Dashboard gọi `GET /stats`, `GET /search`, `GET /alerts`; API dựng truy vấn DSL và trả JSON.
 
 ### 3.2. Log “thô” và log “đã phân tích” (quan điểm thiết kế)
 
@@ -69,8 +70,8 @@ Tài liệu này ghi nhận phương án mở rộng; code hiện tại tương 
 
 ### 4.1. Quy ước index
 
-- **Pattern:** `siem-logs-*` (ví dụ `siem-logs-2026.04.11`).
-- **Rollover theo thời gian:** Do Logstash gắn `%{+YYYY.MM.dd}`, mỗi ngày một index mới — hỗ trợ ILM (xóa index cũ) khi triển khai production.
+- **Log Pattern:** `siem-logs-*` (ví dụ `siem-logs-2026.04.11`). Rollover theo thời gian (Logstash tạo một index mỗi ngày).
+- **Alert Index:** `siem-alerts` (Lưu trữ các cảnh báo được sinh ra bởi Correlation Engine).
 
 ### 4.2. Lược đồ logic (các trường chính)
 
@@ -133,14 +134,244 @@ curl -s "http://localhost:9200/siem-logs-*/_mapping?pretty"
 
 ---
 
-## 6. Đặc tả API (tham chiếu)
+## 6. Đặc tả API
 
-Danh sách endpoint và schema JSON được mô tả đầy đủ tại:
+Tài liệu tương tác đầy đủ (Swagger UI): `http://localhost:8000/docs`
 
-- **OpenAPI tương tác:** `http://localhost:8000/docs`
-- **Bảng tóm tắt:** `README.md`
+Bên dưới là đặc tả inline cho các endpoint lõi.
 
-Các endpoint lõi: `POST /ingest`, `POST /ingest/batch`, `GET /search`, `GET /stats`, `GET /recent`, `GET /health`, `GET /metrics`.
+---
+
+### 6.1. `POST /ingest` — Nhận một log entry
+
+**Request body** (`Content-Type: application/json`):
+
+```json
+{
+  "event_type": "ids_alert",
+  "src_ip": "10.0.0.55",
+  "dest_ip": "192.168.1.100",
+  "severity": 5,
+  "message": "SQL Injection attempt detected: UNION SELECT * FROM users",
+  "source": "ids",
+  "timestamp": "2026-05-03T14:00:00Z",
+  "port": 80,
+  "protocol": "TCP",
+  "action": "alert",
+  "user": "anonymous"
+}
+```
+
+> Trường bắt buộc: `event_type`, `src_ip`, `severity` (1–5), `message`.  
+> Trường tùy chọn: `dest_ip`, `source`, `timestamp` (tự sinh nếu thiếu), `port`, `protocol`, `action`, `user`.
+
+**Response 200:**
+
+```json
+{
+  "status": "success",
+  "message": "Log queued successfully"
+}
+```
+
+**Response 503** (Redis không sẵn sàng):
+
+```json
+{
+  "detail": "Không thể kết nối Redis"
+}
+```
+
+---
+
+### 6.2. `POST /ingest/batch` — Nhận nhiều log cùng lúc (tối đa 10,000)
+
+**Request body:**
+
+```json
+{
+  "logs": [
+    {
+      "event_type": "firewall_block",
+      "src_ip": "203.0.113.42",
+      "severity": 4,
+      "message": "Inbound connection blocked on port 22 (SSH brute force)",
+      "source": "firewall"
+    },
+    {
+      "event_type": "web_access",
+      "src_ip": "192.168.1.10",
+      "severity": 1,
+      "message": "GET /index.html HTTP/1.1 200 OK",
+      "source": "web_server"
+    }
+  ]
+}
+```
+
+**Response 200:**
+
+```json
+{
+  "status": "success",
+  "count": 2,
+  "elapsed_seconds": 0.003,
+  "rate_per_second": 666.7
+}
+```
+
+---
+
+### 6.3. `GET /search` — Tìm kiếm log với bộ lọc
+
+**Query parameters:**
+
+| Tham số | Kiểu | Mô tả |
+|---------|------|-------|
+| `q` | string | Full-text search trên `message` |
+| `src_ip` | string | Lọc chính xác theo IP nguồn |
+| `dest_ip` | string | Lọc chính xác theo IP đích |
+| `event_type` | string | `web_access`, `firewall_block`, `ids_alert`, … |
+| `severity_min` | int (1–5) | Severity tối thiểu |
+| `severity_max` | int (1–5) | Severity tối đa |
+| `source` | string | `web_server`, `firewall`, `ids` |
+| `is_attack` | bool | `true` = chỉ lấy attack events |
+| `time_from` | ISO 8601 | Thời điểm bắt đầu |
+| `time_to` | ISO 8601 | Thời điểm kết thúc |
+| `page` | int | Trang hiện tại (mặc định 1) |
+| `size` | int | Số kết quả/trang (mặc định 50, tối đa 500) |
+| `sort_by` | string | Trường sắp xếp (mặc định `timestamp`) |
+| `sort_order` | string | `asc` hoặc `desc` (mặc định `desc`) |
+
+**Ví dụ request:**
+```
+GET /search?event_type=ids_alert&severity_min=4&is_attack=true&size=20
+```
+
+**Response 200:**
+
+```json
+{
+  "status": "success",
+  "total": 1523,
+  "page": 1,
+  "size": 20,
+  "total_pages": 77,
+  "query_latency_ms": 12.45,
+  "results": [
+    {
+      "_id": "abc123",
+      "_index": "siem-logs-2026.05.03",
+      "event_type": "ids_alert",
+      "src_ip": "10.0.0.55",
+      "dest_ip": "192.168.1.100",
+      "severity": 5,
+      "severity_label": "critical",
+      "message": "SQL Injection attempt detected: UNION SELECT * FROM users",
+      "source": "ids",
+      "is_attack": true,
+      "attack_patterns": ["sql_injection"],
+      "timestamp": "2026-05-03T14:00:00Z",
+      "@timestamp": "2026-05-03T14:00:00.000Z",
+      "ingested_at": "2026-05-03T14:00:01Z",
+      "port": 80,
+      "protocol": "TCP",
+      "action": "alert"
+    }
+  ]
+}
+```
+
+---
+
+### 6.4. `GET /stats` — Thống kê tổng hợp cho Dashboard
+
+**Query parameters:** `time_from`, `time_to` (ISO 8601), `interval` (`5m`, `30m`, `1h`, `6h`, `1d`).
+
+**Response 200 (rút gọn):**
+
+```json
+{
+  "status": "success",
+  "query_latency_ms": 38.2,
+  "summary": {
+    "total_logs": 1000000,
+    "total_attacks": 347821,
+    "unique_ips": 4312,
+    "avg_severity": 2.87
+  },
+  "event_types": [
+    { "name": "web_access", "count": 412000 },
+    { "name": "firewall_block", "count": 198000 }
+  ],
+  "top_attackers": [
+    { "ip": "203.0.113.42", "count": 8921 },
+    { "ip": "198.51.100.15", "count": 7634 }
+  ],
+  "severity_breakdown": [
+    { "level": 1, "count": 310000 },
+    { "level": 5, "count": 89000 }
+  ],
+  "source_distribution": [
+    { "source": "web_server", "count": 450000 },
+    { "source": "firewall", "count": 320000 },
+    { "source": "ids", "count": 230000 }
+  ],
+  "attack_patterns": [
+    { "pattern": "sql_injection", "count": 42100 },
+    { "pattern": "brute_force", "count": 38900 }
+  ],
+  "timeline": [
+    { "time": "2026-05-03T13:00:00.000Z", "total": 12500, "attacks": 4300 },
+    { "time": "2026-05-03T14:00:00.000Z", "total": 15800, "attacks": 5900 }
+  ]
+}
+```
+
+---
+
+### 6.5. `GET /alerts` & `PATCH /alerts/{id}` — Quản lý cảnh báo
+
+- **`GET /alerts`**: Trả về danh sách cảnh báo, hỗ trợ tham số `status` (pending, investigating, resolved) và `size`.
+- **`PATCH /alerts/{alert_id}`**: Nhận JSON `{"status": "resolved"}` để đánh dấu hoàn tất.
+
+---
+
+### 6.5. `GET /health` — Kiểm tra trạng thái hệ thống
+
+**Response 200:**
+
+```json
+{
+  "api": "ok",
+  "redis": "ok",
+  "elasticsearch": "ok",
+  "overall": "ok",
+  "es_version": "7.17.10",
+  "total_indexed_logs": 1000000,
+  "index_size_bytes": 524288000,
+  "index_size_mb": 500.0,
+  "redis_queue_length": 0
+}
+```
+
+---
+
+### 6.6. `GET /metrics` — Số liệu hiệu năng API
+
+**Response 200:**
+
+```json
+{
+  "status": "success",
+  "uptime_seconds": 3721.5,
+  "total_ingested": 1000000,
+  "total_queries": 854,
+  "avg_ingest_rate_per_second": 268.7,
+  "last_batch_ingest_rate": 15420.3,
+  "last_query_latency_ms": 12.45
+}
+```
 
 ---
 

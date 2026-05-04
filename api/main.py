@@ -14,6 +14,9 @@ import redis
 import json
 import time
 import logging
+import asyncio
+import uuid
+from datetime import datetime, timedelta
 
 # ──────────────────────────── Config ────────────────────────────
 
@@ -40,8 +43,9 @@ redis_client = redis.Redis(host='redis', port=6379, db=0, decode_responses=True)
 # Elasticsearch connection
 es_client = Elasticsearch(["http://elasticsearch:9200"])
 
-# Index pattern dùng chung cho tất cả ES query
+# Index patterns
 ES_INDEX_PATTERN = "siem-logs-*"
+ES_ALERT_INDEX = "siem-alerts"
 
 # Metrics tracking (in-memory) — reset khi API restart; chỉ phục vụ monitoring nội bộ
 _metrics = {
@@ -83,6 +87,11 @@ class LogEntry(BaseModel):
 class BatchLogRequest(BaseModel):
     """Schema cho batch log ingestion"""
     logs: List[LogEntry] = Field(..., max_length=10000, description="Danh sách log entries (tối đa 10,000)")
+
+
+class AlertUpdate(BaseModel):
+    """Schema cập nhật trạng thái cảnh báo"""
+    status: str = Field(..., description="Trạng thái: pending, investigating, resolved")
 
 
 # ──────────────────────────── Helpers ────────────────────────────
@@ -162,6 +171,119 @@ def _push_to_queue(log_data: dict):
 
 
 # ES_INDEX_PATTERN được định nghĩa ở phần Config phía trên
+
+
+# ──────────────────────────── Correlation Engine ────────────────────────────
+
+async def correlation_engine():
+    """
+    Background task phân tích log liên tục để phát hiện tấn công và sinh Cảnh báo (Alerts).
+    """
+    logger.info("Correlation Engine started.")
+    # Khởi tạo index alerts nếu chưa có
+    try:
+        if not es_client.indices.exists(index=ES_ALERT_INDEX):
+            es_client.indices.create(index=ES_ALERT_INDEX, body={
+                "mappings": {
+                    "properties": {
+                        "timestamp": {"type": "date"},
+                        "src_ip": {"type": "keyword"},
+                        "event_type": {"type": "keyword"},
+                        "status": {"type": "keyword"},
+                        "severity": {"type": "keyword"},
+                        "message": {"type": "text"}
+                    }
+                }
+            })
+    except Exception as e:
+        logger.warning(f"Could not create alert index: {e}")
+
+    while True:
+        await asyncio.sleep(15)  # Chạy mỗi 15 giây
+        try:
+            now = datetime.utcnow()
+            time_from = (now - timedelta(seconds=15)).strftime('%Y-%m-%dT%H:%M:%SZ')
+            
+            query = {
+                "query": {
+                    "bool": {
+                        "must": [
+                            {"range": {"timestamp": {"gte": time_from}}},
+                            {"bool": {
+                                "should": [
+                                    {"term": {"is_attack": True}},
+                                    {"range": {"severity": {"gte": 4}}}
+                                ]
+                            }}
+                        ]
+                    }
+                },
+                "aggs": {
+                    "by_ip": {
+                        "terms": {"field": "src_ip.keyword", "size": 100},
+                        "aggs": {
+                            "by_event": {
+                                "terms": {"field": "event_type.keyword", "size": 10}
+                            }
+                        }
+                    }
+                },
+                "size": 0
+            }
+            
+            # Sử dụng asyncio.to_thread để không block event loop của FastAPI
+            result = await asyncio.to_thread(es_client.search, index=ES_INDEX_PATTERN, body=query, ignore_unavailable=True)
+            aggs = result.get("aggregations", {}).get("by_ip", {}).get("buckets", [])
+            
+            for ip_bucket in aggs:
+                src_ip = ip_bucket["key"]
+                for event_bucket in ip_bucket.get("by_event", {}).get("buckets", []):
+                    event_type = event_bucket["key"]
+                    count = event_bucket["doc_count"]
+                    
+                    # Rule: Nếu có >= 3 logs hoặc là loại sự kiện nguy hiểm
+                    if count >= 3 or event_type in ["ids_alert", "malware_detected", "dos_attack"]:
+                        # Kiểm tra xem có cảnh báo đang pending không
+                        pending_query = {
+                            "query": {
+                                "bool": {
+                                    "must": [
+                                        {"term": {"src_ip": src_ip}},
+                                        {"term": {"event_type": event_type}},
+                                        {"term": {"status": "pending"}}
+                                    ]
+                                }
+                            }
+                        }
+                        existing = await asyncio.to_thread(es_client.search, index=ES_ALERT_INDEX, body=pending_query, ignore_unavailable=True)
+                        if existing.get("hits", {}).get("total", {}).get("value", 0) > 0:
+                            # Cập nhật số lượng log liên quan
+                            alert_id = existing["hits"]["hits"][0]["_id"]
+                            await asyncio.to_thread(
+                                es_client.update,
+                                index=ES_ALERT_INDEX, 
+                                id=alert_id, 
+                                body={"script": {"source": "ctx._source.related_logs += params.count", "params": {"count": count}}}
+                            )
+                        else:
+                            # Tạo cảnh báo mới
+                            alert_doc = {
+                                "timestamp": now.strftime('%Y-%m-%dT%H:%M:%SZ'),
+                                "src_ip": src_ip,
+                                "event_type": event_type,
+                                "related_logs": count,
+                                "status": "pending",
+                                "severity": "high" if count > 10 else "medium",
+                                "message": f"Phát hiện {count} sự kiện {event_type} từ {src_ip}"
+                            }
+                            await asyncio.to_thread(es_client.index, index=ES_ALERT_INDEX, body=alert_doc)
+        except Exception as e:
+            logger.error(f"Correlation engine error: {e}")
+
+
+@app.on_event("startup")
+async def startup_event():
+    asyncio.create_task(correlation_engine())
 
 
 # ──────────────────────────── API Endpoints ────────────────────────────
@@ -527,6 +649,56 @@ async def get_recent_logs(
         raise HTTPException(status_code=500, detail=f"Lỗi lấy log gần nhất: {str(e)}")
 
 
+# ─── 4.5. Alerts ───
+
+@app.get("/alerts", tags=["Alerts"])
+async def get_alerts(
+    status: Optional[str] = Query(None, description="Lọc theo trạng thái: pending, investigating, resolved"),
+    size: int = Query(50, ge=1, le=500, description="Số kết quả"),
+):
+    """Lấy danh sách các cảnh báo (Alerts) từ Correlation Engine."""
+    try:
+        query_body = {"match_all": {}}
+        if status:
+            query_body = {"term": {"status": status}}
+
+        result = es_client.search(
+            index=ES_ALERT_INDEX,
+            body={
+                "query": query_body,
+                "sort": [{"timestamp": {"order": "desc"}}],
+                "size": size,
+            },
+            ignore_unavailable=True,
+        )
+
+        alerts = []
+        for hit in result.get("hits", {}).get("hits", []):
+            alert = hit["_source"]
+            alert["_id"] = hit["_id"]
+            alerts.append(alert)
+
+        return {"status": "success", "total": len(alerts), "results": alerts}
+    except Exception as e:
+        logger.error(f"Alerts retrieval error: {e}")
+        raise HTTPException(status_code=500, detail=f"Lỗi lấy danh sách cảnh báo: {str(e)}")
+
+
+@app.patch("/alerts/{alert_id}", tags=["Alerts"])
+async def update_alert_status(alert_id: str, update: AlertUpdate):
+    """Cập nhật trạng thái của một cảnh báo."""
+    try:
+        es_client.update(
+            index=ES_ALERT_INDEX,
+            id=alert_id,
+            body={"doc": {"status": update.status}}
+        )
+        return {"status": "success", "message": f"Đã cập nhật trạng thái thành {update.status}"}
+    except Exception as e:
+        logger.error(f"Alert update error: {e}")
+        raise HTTPException(status_code=500, detail=f"Lỗi cập nhật cảnh báo: {str(e)}")
+
+
 # ─── 5. Health Check ───
 
 @app.get("/health", tags=["System"])
@@ -607,6 +779,8 @@ async def root():
             "GET /search": "Tìm kiếm log với filters",
             "GET /stats": "Thống kê attack",
             "GET /recent": "Log gần nhất (live feed)",
+            "GET /alerts": "Lấy danh sách cảnh báo (Alerts)",
+            "PATCH /alerts/{id}": "Cập nhật trạng thái cảnh báo",
             "GET /health": "Health check",
             "GET /metrics": "Performance metrics",
             "GET /docs": "API documentation (Swagger)",

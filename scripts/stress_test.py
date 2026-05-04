@@ -85,7 +85,6 @@ def generate_log():
     event_type = random.choice(EVENT_TYPES)
     messages = MESSAGES.get(event_type, ["Generic log entry"])
 
-    # Random timestamp trong 24h gần đây
     offset = random.randint(0, 86400)
     ts = (datetime.utcnow() - timedelta(seconds=offset)).strftime('%Y-%m-%dT%H:%M:%SZ')
 
@@ -128,11 +127,6 @@ def send_batch(batch_size=1000):
 def run_stress_test(total_entries=1000000, batch_size=5000, max_workers=8):
     """
     Chạy stress test với concurrent batch requests.
-
-    Args:
-        total_entries: Tổng số log cần gửi (mặc định 1M)
-        batch_size: Số log mỗi batch (mặc định 5,000)
-        max_workers: Số thread đồng thời (mặc định 8)
     """
     print("=" * 60)
     print("  MINI SIEM - STRESS TEST")
@@ -143,7 +137,6 @@ def run_stress_test(total_entries=1000000, batch_size=5000, max_workers=8):
     print(f"  API endpoint:     {API_URL}/ingest/batch")
     print("=" * 60)
 
-    # Check API health first
     try:
         health = requests.get(f"{API_URL}/health", timeout=5).json()
         print(f"\n✅ API Status:   {health.get('overall', 'unknown')}")
@@ -178,7 +171,6 @@ def run_stress_test(total_entries=1000000, batch_size=5000, max_workers=8):
             else:
                 total_failed += 1
 
-            # Progress report
             progress = ((i + 1) / num_batches) * 100
             elapsed = time.time() - start_time
             rate = total_sent / elapsed if elapsed > 0 else 0
@@ -203,35 +195,6 @@ def run_stress_test(total_entries=1000000, batch_size=5000, max_workers=8):
     print(f"  🚀 Throughput tổng:        {avg_rate:,.0f} logs/giây")
     print(f"  📊 Avg batch throughput:   {avg_batch_rate:,.0f} logs/giây")
     print("=" * 60)
-
-    # Wait and check ES
-    print("\n⏳ Đợi 10 giây cho Logstash xử lý...")
-    time.sleep(10)
-
-    try:
-        health = requests.get(f"{API_URL}/health", timeout=5).json()
-        indexed = health.get("total_indexed_logs", 0)
-        queue = health.get("redis_queue_length", 0)
-        print(f"\n📊 Elasticsearch indexed:  {indexed:,} logs")
-        print(f"📬 Redis queue remaining:  {queue:,} logs")
-        print(f"💾 Index size:             {health.get('index_size_mb', 0)} MB")
-    except:
-        pass
-
-    # Test query latency
-    print("\n🔍 Test query latency...")
-    try:
-        start = time.time()
-        search_result = requests.get(f"{API_URL}/search?size=10", timeout=10).json()
-        latency = (time.time() - start) * 1000
-        api_latency = search_result.get("query_latency_ms", 0)
-        print(f"   Total latency:   {latency:.2f} ms")
-        print(f"   ES query latency: {api_latency} ms")
-        print(f"   Results found:   {search_result.get('total', 0):,}")
-    except Exception as e:
-        print(f"   ❌ Query test failed: {e}")
-
-    print("\n" + "=" * 60)
     print("  ✅ STRESS TEST HOÀN TẤT!")
     print("=" * 60)
 
