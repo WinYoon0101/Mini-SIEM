@@ -88,6 +88,8 @@ def generate_log():
     offset = random.randint(0, 86400)
     ts = (datetime.utcnow() - timedelta(seconds=offset)).strftime('%Y-%m-%dT%H:%M:%SZ')
 
+    # ts = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+
     return {
         "event_type": event_type,
         "src_ip": random.choice(IPS),
@@ -139,9 +141,10 @@ def run_stress_test(total_entries=1000000, batch_size=5000, max_workers=8):
 
     try:
         health = requests.get(f"{API_URL}/health", timeout=5).json()
+        initial_logs = health.get('total_indexed_logs', 0)
         print(f"\n✅ API Status:   {health.get('overall', 'unknown')}")
         print(f"   Redis:        {health.get('redis', 'unknown')}")
-        print(f"   ES:           {health.get('elasticsearch', 'unknown')}")
+        print(f"   ES:           {health.get('elasticsearch', 'unknown')} (Current logs: {initial_logs:,})")
     except Exception as e:
         print(f"\n❌ Không thể kết nối API: {e}")
         print("   Hãy chắc chắn docker-compose đã chạy!")
@@ -181,19 +184,45 @@ def run_stress_test(total_entries=1000000, batch_size=5000, max_workers=8):
                       f"Rate: {rate:,.0f} logs/s | "
                       f"Elapsed: {elapsed:.1f}s")
 
-    end_time = time.time()
-    duration = end_time - start_time
-    avg_rate = total_sent / duration if duration > 0 else 0
+    end_send_time = time.time()
+    send_duration = end_send_time - start_time
+    avg_send_rate = total_sent / send_duration if send_duration > 0 else 0
     avg_batch_rate = sum(batch_rates) / len(batch_rates) if batch_rates else 0
+
+    print("\n⏳ Đang chờ Elasticsearch index toàn bộ dữ liệu...")
+    
+    target_logs = initial_logs + total_sent
+    current_logs = initial_logs
+    
+    while current_logs < target_logs:
+        try:
+            health = requests.get(f"{API_URL}/health", timeout=5).json()
+            current_logs = health.get('total_indexed_logs', 0)
+            queued = health.get('redis_queue_length', 0)
+            indexed_so_far = current_logs - initial_logs
+            
+            print(f"  [ES Indexing] Đã vào ES: {indexed_so_far:,}/{total_sent:,} | Redis Queue: {queued:,}", end="\r")
+            
+            if current_logs >= target_logs:
+                print(f"  [ES Indexing] Đã vào ES: {total_sent:,}/{total_sent:,} | Redis Queue: 0{' ' * 20}")
+                break
+        except Exception:
+            pass
+        time.sleep(2)
+
+    e2e_end_time = time.time()
+    e2e_duration = e2e_end_time - start_time
+    e2e_rate = total_sent / e2e_duration if e2e_duration > 0 else 0
 
     print("\n" + "=" * 60)
     print("  KẾT QUẢ STRESS TEST")
     print("=" * 60)
-    print(f"  ✅ Tổng log đã gửi:      {total_sent:,}")
-    print(f"  ❌ Batches thất bại:      {total_failed}")
-    print(f"  ⏱  Tổng thời gian:        {duration:.2f} giây")
-    print(f"  🚀 Throughput tổng:        {avg_rate:,.0f} logs/giây")
-    print(f"  📊 Avg batch throughput:   {avg_batch_rate:,.0f} logs/giây")
+    print(f"  ✅ Tổng log đã gửi:         {total_sent:,}")
+    print(f"  ❌ Batches thất bại:         {total_failed}")
+    print(f"  ⏱  Thời gian gửi (API):      {send_duration:.2f} giây")
+    print(f"  🚀 Tốc độ gửi (API):         {avg_send_rate:,.0f} logs/giây")
+    print(f"  ⏱  Thời gian E2E (Tới ES):   {e2e_duration:.2f} giây")
+    print(f"  🚀 Throughput E2E (Thực tế): {e2e_rate:,.0f} logs/giây")
     print("=" * 60)
     print("  ✅ STRESS TEST HOÀN TẤT!")
     print("=" * 60)

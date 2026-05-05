@@ -187,7 +187,7 @@ async def correlation_engine():
                 "mappings": {
                     "properties": {
                         "timestamp": {"type": "date"},
-                        "src_ip": {"type": "keyword"},
+                        "src_ip": {"type": "ip"},
                         "event_type": {"type": "keyword"},
                         "status": {"type": "keyword"},
                         "severity": {"type": "keyword"},
@@ -200,15 +200,46 @@ async def correlation_engine():
 
     while True:
         await asyncio.sleep(15)  # Chạy mỗi 15 giây
+        
+        # Distributed lock: Chỉ cho phép 1 worker thực thi Correlation trong mỗi chu kỳ 15s
+        lock_acquired = redis_client.set("correlation_lock", "locked", nx=True, ex=14)
+        if not lock_acquired:
+            continue
+            
         try:
             now = datetime.utcnow()
-            time_from = (now - timedelta(seconds=15)).strftime('%Y-%m-%dT%H:%M:%SZ')
+            
+            # Lấy mốc thời gian đã xử lý từ Redis để không sót log hoặc overlap
+            last_time_str = redis_client.get("correlation_last_time")
+            if last_time_str:
+                try:
+                    time_from_dt = datetime.fromisoformat(last_time_str)
+                except ValueError:
+                    time_from_dt = now - timedelta(seconds=60)
+            else:
+                time_from_dt = now - timedelta(seconds=60)
+            
+            # time_to luôn trễ hơn hiện tại 45s để đảm bảo ES đã hoàn tất refresh (refresh_interval=30s)
+            time_to_dt = now - timedelta(seconds=45)
+            
+            # Giới hạn window tối đa là 120s để tránh query quá lớn nếu API bị tắt lâu
+            if (time_to_dt - time_from_dt).total_seconds() > 120:
+                time_from_dt = time_to_dt - timedelta(seconds=120)
+                
+            if time_from_dt >= time_to_dt:
+                continue
+                
+            time_from = time_from_dt.strftime('%Y-%m-%dT%H:%M:%SZ')
+            time_to = time_to_dt.strftime('%Y-%m-%dT%H:%M:%SZ')
+            
+            # Cập nhật mốc thời gian cho lần chạy tiếp theo
+            redis_client.set("correlation_last_time", time_to_dt.isoformat())
             
             query = {
                 "query": {
                     "bool": {
                         "must": [
-                            {"range": {"timestamp": {"gte": time_from}}},
+                            {"range": {"timestamp": {"gte": time_from, "lt": time_to}}},
                             {"bool": {
                                 "should": [
                                     {"term": {"is_attack": True}},
@@ -220,10 +251,10 @@ async def correlation_engine():
                 },
                 "aggs": {
                     "by_ip": {
-                        "terms": {"field": "src_ip.keyword", "size": 100},
+                        "terms": {"field": "src_ip", "size": 100},
                         "aggs": {
                             "by_event": {
-                                "terms": {"field": "event_type.keyword", "size": 10}
+                                "terms": {"field": "event_type", "size": 10}
                             }
                         }
                     }
@@ -266,14 +297,13 @@ async def correlation_engine():
                                 body={"script": {"source": "ctx._source.related_logs += params.count", "params": {"count": count}}}
                             )
                         else:
-                            # Tạo cảnh báo mới
                             alert_doc = {
                                 "timestamp": now.strftime('%Y-%m-%dT%H:%M:%SZ'),
                                 "src_ip": src_ip,
                                 "event_type": event_type,
                                 "related_logs": count,
                                 "status": "pending",
-                                "severity": "high" if count > 10 else "medium",
+                                "severity": "high" if count > 5 else "medium",
                                 "message": f"Phát hiện {count} sự kiện {event_type} từ {src_ip}"
                             }
                             await asyncio.to_thread(es_client.index, index=ES_ALERT_INDEX, body=alert_doc)
@@ -378,13 +408,13 @@ async def search_logs(
             must_clauses.append({"query_string": {"query": q}})
 
         if src_ip:
-            filter_clauses.append({"term": {"src_ip.keyword": src_ip}})
+            filter_clauses.append({"term": {"src_ip": src_ip}})
         if dest_ip:
-            filter_clauses.append({"term": {"dest_ip.keyword": dest_ip}})
+            filter_clauses.append({"term": {"dest_ip": dest_ip}})
         if event_type:
-            filter_clauses.append({"term": {"event_type.keyword": event_type}})
+            filter_clauses.append({"term": {"event_type": event_type}})
         if source:
-            filter_clauses.append({"term": {"source.keyword": source}})
+            filter_clauses.append({"term": {"source": source}})
         if is_attack is not None:
             filter_clauses.append({"term": {"is_attack": is_attack}})
 
@@ -485,7 +515,7 @@ async def get_attack_statistics(
             "query": base_query,
             "aggs": {
                 # Tổng số log
-                "total_logs": {"value_count": {"field": "event_type.keyword"}},
+                "total_logs": {"value_count": {"field": "event_type"}},
 
                 # Tổng attacks
                 "total_attacks": {
@@ -493,14 +523,14 @@ async def get_attack_statistics(
                 },
 
                 # Unique IPs
-                "unique_ips": {"cardinality": {"field": "src_ip.keyword"}},
+                "unique_ips": {"cardinality": {"field": "src_ip"}},
 
                 # Average severity
                 "avg_severity": {"avg": {"field": "severity"}},
 
                 # Event type distribution
                 "event_types": {
-                    "terms": {"field": "event_type.keyword", "size": 20}
+                    "terms": {"field": "event_type", "size": 20}
                 },
 
                 # Top attacking IPs
@@ -508,7 +538,7 @@ async def get_attack_statistics(
                     "filter": {"term": {"is_attack": True}},
                     "aggs": {
                         "ips": {
-                            "terms": {"field": "src_ip.keyword", "size": 10}
+                            "terms": {"field": "src_ip", "size": 10}
                         }
                     }
                 },
@@ -520,12 +550,12 @@ async def get_attack_statistics(
 
                 # Severity label breakdown
                 "severity_labels": {
-                    "terms": {"field": "severity_label.keyword", "size": 5}
+                    "terms": {"field": "severity_label", "size": 5}
                 },
 
                 # Source distribution
                 "source_distribution": {
-                    "terms": {"field": "source.keyword", "size": 10}
+                    "terms": {"field": "source", "size": 10}
                 },
 
                 # Attack patterns

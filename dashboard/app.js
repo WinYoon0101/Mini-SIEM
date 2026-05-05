@@ -876,7 +876,7 @@ function renderAlerts(alerts) {
                 <td><span class="log-event">${alert.event_type}</span></td>
                 <td><span class="severity-badge severity-${alert.severity === 'high' ? '5' : '3'}">${alert.severity}</span></td>
                 <td>${alert.related_logs}</td>
-                <td>${alert.message}</td>
+                <td>Phát hiện ${alert.related_logs} sự kiện ${alert.event_type} từ ${alert.src_ip}</td>
                 <td>${actionBtn}</td>
             </tr>
         `;
