@@ -60,6 +60,10 @@ services:
   # 4. Bộ xử lý log - Logstash
   logstash:
     image: docker.elastic.co/logstash/logstash:7.17.10
+    environment:
+      - PIPELINE_WORKERS=4
+      - PIPELINE_BATCH_SIZE=2000
+      - PIPELINE_BATCH_DELAY=50
     volumes:
       - ./logstash/pipeline:/usr/share/logstash/pipeline
     depends_on:
@@ -90,6 +94,10 @@ services:
     build: ./dashboard
     ports:
       - "3000:3000"
+    volumes:
+      - ./dashboard/index.html:/usr/share/nginx/html/index.html
+      - ./dashboard/style.css:/usr/share/nginx/html/style.css
+      - ./dashboard/app.js:/usr/share/nginx/html/app.js
     depends_on:
       - api-collector
     restart: unless-stopped

@@ -80,18 +80,18 @@ Tài liệu này ghi nhận phương án mở rộng; code hiện tại tương 
 | `@timestamp` | `date` | Thời điểm sự kiện (chuẩn hóa từ `timestamp` trong Logstash). |
 | `timestamp` | `date` | Bản gốc từ client (nếu có). |
 | `ingested_at` | `date` | Thời điểm ghi nhận pipeline (metadata). |
-| `event_type` | text + `.keyword` | Loại sự kiện; filter/agg dùng `.keyword`. |
-| `src_ip`, `dest_ip` | text + `.keyword` | Địa chỉ IP (term filter trên `.keyword`). |
-| `source` | text + `.keyword` | Nguồn: `web_server`, `firewall`, `ids`. |
+| `event_type` | `keyword` | Loại sự kiện; filter/agg trực tiếp. |
+| `src_ip`, `dest_ip` | `ip` | Địa chỉ IP (đã tối ưu kiểu `ip`). |
+| `source` | `keyword` | Nguồn: `web_server`, `firewall`, `ids`. |
 | `severity` | integer | Mức 1–5. |
-| `severity_label` | text + `.keyword` | Nhãn: info, low, medium, high, critical. |
+| `severity_label` | `keyword` | Nhãn: info, low, medium, high, critical. |
 | `message` | `text` | Nội dung log; hỗ trợ full-text (`query_string`). |
 | `log_message` | `text` | (Luồng parse tùy chọn từ Logstash khi `message` là JSON lồng). |
 | `is_attack` | boolean | Cờ sự kiện tấn công / đáng ngờ. |
 | `attack_patterns` | `keyword` (mảng) | Các nhãn pattern (vd. `sql_injection`, `port_scan`). |
 | `port` | integer | Cổng liên quan. |
-| `protocol`, `action` | keyword | Giao thức, hành động. |
-| `user`, `username` | keyword | User từ API / Logstash. |
+| `protocol`, `action` | `keyword` | Giao thức, hành động. |
+| `user`, `username` | `keyword` | User từ API / Logstash. |
 
 File mapping máy đọc được nằm tại: `elasticsearch/index-templates/siem-logs-template.json`.
 
@@ -115,17 +115,10 @@ Hệ thống dùng **Elasticsearch Composable Index Template** tên `siem-logs`,
 
 ### 5.3. Tham số index
 
-- `number_of_shards: 1`, `number_of_replicas: 0`: phù hợp **single-node** trong môi trường lab; khi cluster nhiều node, tăng replica và shard theo khối lượng.
-- `refresh_interval: 5s`: cân bằng độ “near real-time” và tải ghi; có thể tăng tạm (vd. `30s`) khi bulk ingest lớn.
+- `number_of_shards: 1`, `number_of_replicas: 0`: phù hợp **single-node** trong môi trường lab.
+- `refresh_interval: 30s`: đã được tăng lên 30s để tối đa hóa Ingestion Throughput, gộp các bulk request thành các segments lớn.
 
-### 5.4. Lưu ý khi đổi template sau khi đã có dữ liệu
-
-Elasticsearch **không** tự sửa mapping mạnh trên index cũ. Sau khi chỉnh template:
-
-- Xóa index thử nghiệm: `DELETE siem-logs-*` (mất dữ liệu local), hoặc
-- **Reindex** sang index mới với mapping đã cập nhật.
-
-### 5.5. Kiểm tra nhanh sau khi khởi động
+### 5.4. Kiểm tra nhanh sau khi khởi động
 
 ```bash
 curl -s "http://localhost:9200/_index_template/siem-logs?pretty"

@@ -54,7 +54,7 @@ pip install requests
 python scripts/seed_data.py 100
 
 # 4. Mở Dashboard
-# http://localhost:3000
+ http://localhost:3000
 ```
 
 ## 📡 API Endpoints

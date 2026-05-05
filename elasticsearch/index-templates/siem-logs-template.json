@@ -9,7 +9,7 @@
     "settings": {
       "number_of_shards": 1,
       "number_of_replicas": 0,
-      "refresh_interval": "5s"
+      "refresh_interval": "30s"
     },
     "mappings": {
       "properties": {
@@ -25,40 +25,18 @@
           "ignore_malformed": true
         },
         "event_type": {
-          "type": "text",
-          "fields": {
-            "keyword": {
-              "type": "keyword",
-              "ignore_above": 256
-            }
-          }
+          "type": "keyword",
+          "ignore_above": 256
         },
         "src_ip": {
-          "type": "text",
-          "fields": {
-            "keyword": {
-              "type": "keyword",
-              "ignore_above": 256
-            }
-          }
+          "type": "ip"
         },
         "dest_ip": {
-          "type": "text",
-          "fields": {
-            "keyword": {
-              "type": "keyword",
-              "ignore_above": 256
-            }
-          }
+          "type": "ip"
         },
         "source": {
-          "type": "text",
-          "fields": {
-            "keyword": {
-              "type": "keyword",
-              "ignore_above": 256
-            }
-          }
+          "type": "keyword",
+          "ignore_above": 256
         },
         "log_source": {
           "type": "keyword",
@@ -68,22 +46,11 @@
           "type": "integer"
         },
         "severity_label": {
-          "type": "text",
-          "fields": {
-            "keyword": {
-              "type": "keyword",
-              "ignore_above": 64
-            }
-          }
+          "type": "keyword",
+          "ignore_above": 64
         },
         "message": {
-          "type": "text",
-          "fields": {
-            "keyword": {
-              "type": "keyword",
-              "ignore_above": 256
-            }
-          }
+          "type": "text"
         },
         "log_message": {
           "type": "text"

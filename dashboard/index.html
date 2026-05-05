@@ -3,476 +3,142 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Mini SIEM - Security Information and Event Management Dashboard">
     <title>Mini SIEM Dashboard</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 </head>
 <body>
-    <!-- ─── Sidebar ─── -->
     <aside class="sidebar" id="sidebar">
-        <div class="sidebar-brand">
-            <div class="brand-icon">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                </svg>
-            </div>
-            <span class="brand-text">Mini SIEM</span>
-        </div>
-
+        <div class="sidebar-brand">Mini SIEM</div>
         <nav class="sidebar-nav">
-            <a href="#" class="nav-item active" data-tab="dashboard" id="nav-dashboard">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-                    <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
-                </svg>
-                <span>Dashboard</span>
-            </a>
-            <a href="#" class="nav-item" data-tab="search" id="nav-search">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-                </svg>
-                <span>Tìm kiếm Log</span>
-            </a>
-            <a href="#" class="nav-item" data-tab="livefeed" id="nav-livefeed">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-                </svg>
-                <span>Live Feed</span>
-            </a>
-            <a href="#" class="nav-item" data-tab="alerts" id="nav-alerts">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                    <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                </svg>
-                <span>Cảnh báo</span>
-                <span class="nav-badge" id="nav-alert-badge" style="display: none;">0</span>
-            </a>
-            <a href="#" class="nav-item" data-tab="system" id="nav-system">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="3"/>
-                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-                </svg>
-                <span>Hệ thống</span>
-            </a>
-        </nav>
+            <a href="#" class="nav-item active" data-tab="dashboard">Dashboard</a>
+            <a href="#" class="nav-item" data-tab="search">Tìm kiếm Log</a>
+            <a href="#" class="nav-item" data-tab="livefeed">Live Feed</a>
+            <a href="#" class="nav-item" data-tab="alerts">Cảnh báo <span class="nav-badge" id="nav-alert-badge" style="display: none;">0</span></a>
 
-        <div class="sidebar-footer">
-            <div class="system-status" id="system-status">
-                <div class="status-dot"></div>
-                <span>Đang kết nối...</span>
-            </div>
-        </div>
+        </nav>
+        <div class="sidebar-footer" id="system-status">Đang kết nối...</div>
     </aside>
 
-    <!-- ─── Main Content ─── -->
     <main class="main-content">
-        <!-- Header -->
         <header class="top-header">
             <div class="header-left">
-                <button class="menu-toggle" id="menu-toggle">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="3" y1="12" x2="21" y2="12"/>
-                        <line x1="3" y1="6" x2="21" y2="6"/>
-                        <line x1="3" y1="18" x2="21" y2="18"/>
-                    </svg>
-                </button>
+                <button class="menu-toggle" id="menu-toggle">☰</button>
                 <h1 class="page-title" id="page-title">Dashboard</h1>
             </div>
             <div class="header-right">
                 <div class="time-range-selector">
-                    <button class="time-btn active" data-range="1h" id="tr-1h">1H</button>
-                    <button class="time-btn" data-range="6h" id="tr-6h">6H</button>
-                    <button class="time-btn" data-range="24h" id="tr-24h">24H</button>
-                    <button class="time-btn" data-range="7d" id="tr-7d">7D</button>
-                    <button class="time-btn" data-range="30d" id="tr-30d">30D</button>
+                    <button class="time-btn active" data-range="1h">1H</button>
+                    <button class="time-btn" data-range="6h">6H</button>
+                    <button class="time-btn" data-range="24h">24H</button>
+                    <button class="time-btn" data-range="7d">7D</button>
+                    <button class="time-btn" data-range="30d">30D</button>
                 </div>
-                <button class="refresh-btn" id="refresh-btn" title="Làm mới dữ liệu">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
-                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-                    </svg>
-                </button>
-                <div class="auto-refresh-badge" id="auto-refresh-badge">
-                    <div class="pulse-dot"></div>
-                    <span>Auto 30s</span>
-                </div>
+                <button class="refresh-btn" id="refresh-btn" title="Làm mới">↻</button>
             </div>
         </header>
 
-        <!-- ═══ Tab: Dashboard ═══ -->
+        <!-- Tab: Dashboard -->
         <section class="tab-content active" id="tab-dashboard">
-            <!-- Stats Cards -->
             <div class="stats-grid">
-                <div class="stat-card" id="card-total-logs">
-                    <div class="stat-icon blue">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                            <polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/>
-                            <line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
-                        </svg>
-                    </div>
-                    <div class="stat-info">
-                        <span class="stat-label">Tổng Log</span>
-                        <span class="stat-value" id="stat-total-logs">---</span>
-                    </div>
-                </div>
-                <div class="stat-card" id="card-attacks">
-                    <div class="stat-icon red">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                            <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                        </svg>
-                    </div>
-                    <div class="stat-info">
-                        <span class="stat-label">Attacks</span>
-                        <span class="stat-value" id="stat-attacks">---</span>
-                    </div>
-                </div>
-                <div class="stat-card" id="card-unique-ips">
-                    <div class="stat-icon orange">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
-                            <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
-                            <line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>
-                        </svg>
-                    </div>
-                    <div class="stat-info">
-                        <span class="stat-label">Unique IPs</span>
-                        <span class="stat-value" id="stat-unique-ips">---</span>
-                    </div>
-                </div>
-                <div class="stat-card" id="card-avg-severity">
-                    <div class="stat-icon purple">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-                        </svg>
-                    </div>
-                    <div class="stat-info">
-                        <span class="stat-label">Avg Severity</span>
-                        <span class="stat-value" id="stat-avg-severity">---</span>
-                    </div>
-                </div>
+                <div class="stat-card"><span class="stat-label">Tổng Log</span><span class="stat-value" id="stat-total-logs">---</span></div>
+                <div class="stat-card"><span class="stat-label">Attacks</span><span class="stat-value" id="stat-attacks">---</span></div>
+                <div class="stat-card"><span class="stat-label">Unique IPs</span><span class="stat-value" id="stat-unique-ips">---</span></div>
+                <div class="stat-card"><span class="stat-label">Avg Severity</span><span class="stat-value" id="stat-avg-severity">---</span></div>
             </div>
-
-            <!-- Charts Row 1 -->
             <div class="charts-grid-2">
-                <div class="chart-card">
-                    <div class="chart-header">
-                        <h3>Attack Timeline</h3>
-                        <span class="chart-subtitle" id="timeline-subtitle">—</span>
-                    </div>
-                    <div class="chart-body">
-                        <canvas id="chart-timeline"></canvas>
-                    </div>
-                </div>
-                <div class="chart-card">
-                    <div class="chart-header">
-                        <h3>Event Types</h3>
-                    </div>
-                    <div class="chart-body chart-body-doughnut">
-                        <canvas id="chart-event-types"></canvas>
-                    </div>
-                </div>
+                <div class="chart-card"><div class="chart-header"><span>Timeline</span><span class="chart-subtitle" id="timeline-subtitle"></span></div><div class="chart-body"><canvas id="chart-timeline"></canvas></div></div>
+                <div class="chart-card"><div class="chart-header"><span>Loại Sự Kiện</span></div><div class="chart-body"><canvas id="chart-event-types"></canvas></div></div>
             </div>
-
-            <!-- Charts Row 2 -->
             <div class="charts-grid-2">
-                <div class="chart-card">
-                    <div class="chart-header">
-                        <h3>Top 10 Attacking IPs</h3>
-                    </div>
-                    <div class="chart-body">
-                        <canvas id="chart-top-ips"></canvas>
-                    </div>
-                </div>
-                <div class="chart-card">
-                    <div class="chart-header">
-                        <h3>Severity Distribution</h3>
-                    </div>
-                    <div class="chart-body chart-body-doughnut">
-                        <canvas id="chart-severity"></canvas>
-                    </div>
-                </div>
+                <div class="chart-card"><div class="chart-header"><span>Top IP Tấn Công</span></div><div class="chart-body"><canvas id="chart-top-ips"></canvas></div></div>
+                <div class="chart-card"><div class="chart-header"><span>Phân Bố Mức Độ</span></div><div class="chart-body"><canvas id="chart-severity"></canvas></div></div>
             </div>
-
-            <!-- Charts Row 3 -->
             <div class="charts-grid-2">
-                <div class="chart-card">
-                    <div class="chart-header">
-                        <h3>Log Sources</h3>
-                    </div>
-                    <div class="chart-body chart-body-doughnut">
-                        <canvas id="chart-sources"></canvas>
-                    </div>
-                </div>
-                <div class="chart-card">
-                    <div class="chart-header">
-                        <h3 title="Nhãn suy luận từ từ khóa trong message (vd. sql_injection, xss) và từ loại sự kiện nếu message không khớp.">Attack Patterns</h3>
-                        <span class="chart-subtitle">Theo message + loại sự kiện tấn công</span>
-                    </div>
-                    <div class="chart-body">
-                        <p class="chart-empty-hint" id="attack-patterns-empty" hidden>Chưa có pattern trong khoảng thời gian đã chọn.</p>
-                        <canvas id="chart-attack-patterns"></canvas>
-                    </div>
-                </div>
+                <div class="chart-card"><div class="chart-header"><span>Nguồn Log</span></div><div class="chart-body"><canvas id="chart-sources"></canvas></div></div>
+                <div class="chart-card"><div class="chart-header"><span>Hành Vi Tấn Công</span></div><div class="chart-body"><p class="chart-empty-hint" id="attack-patterns-empty" hidden>Chưa có pattern</p><canvas id="chart-attack-patterns"></canvas></div></div>
             </div>
         </section>
 
-        <!-- ═══ Tab: Search ═══ -->
+        <!-- Tab: Search -->
         <section class="tab-content" id="tab-search">
             <div class="search-panel">
-                <div class="search-filters">
-                    <div class="filter-row">
-                        <div class="filter-group">
-                            <label>Tìm kiếm (Full-text)</label>
-                            <input type="text" id="search-query" placeholder="VD: SQL Injection, failed login..." class="filter-input">
-                        </div>
-                        <div class="filter-group">
-                            <label>IP Nguồn</label>
-                            <input type="text" id="search-ip" placeholder="VD: 192.168.1.10" class="filter-input">
-                        </div>
-                        <div class="filter-group">
-                            <label>Event Type</label>
-                            <select id="search-event-type" class="filter-select">
-                                <option value="">Tất cả</option>
-                                <option value="web_access">Web Access</option>
-                                <option value="firewall_block">Firewall Block</option>
-                                <option value="ids_alert">IDS Alert</option>
-                                <option value="login_success">Login Success</option>
-                                <option value="login_failure">Login Failure</option>
-                                <option value="port_scan">Port Scan</option>
-                                <option value="malware_detected">Malware</option>
-                                <option value="dos_attack">DoS Attack</option>
-                            </select>
-                        </div>
+                <div class="filter-row">
+                    <div class="filter-group"><label>Tìm kiếm</label><input type="text" id="search-query" class="filter-input"></div>
+                    <div class="filter-group"><label>IP Nguồn</label><input type="text" id="search-ip" class="filter-input"></div>
+                    <div class="filter-group">
+                        <label>Event Type</label>
+                        <select id="search-event-type" class="filter-select">
+                            <option value="">Tất cả</option><option value="web_access">Web Access</option><option value="firewall_block">Firewall Block</option><option value="ids_alert">IDS Alert</option><option value="login_success">Login Success</option><option value="login_failure">Login Failure</option><option value="port_scan">Port Scan</option><option value="malware_detected">Malware</option><option value="dos_attack">DoS Attack</option>
+                        </select>
                     </div>
-                    <div class="filter-row">
-                        <div class="filter-group">
-                            <label>Nguồn</label>
-                            <select id="search-source" class="filter-select">
-                                <option value="">Tất cả</option>
-                                <option value="web_server">Web Server</option>
-                                <option value="firewall">Firewall</option>
-                                <option value="ids">IDS</option>
-                            </select>
-                        </div>
-                        <div class="filter-group">
-                            <label>Severity Min</label>
-                            <select id="search-severity-min" class="filter-select">
-                                <option value="">Tất cả</option>
-                                <option value="1">1 - Info</option>
-                                <option value="2">2 - Low</option>
-                                <option value="3">3 - Medium</option>
-                                <option value="4">4 - High</option>
-                                <option value="5">5 - Critical</option>
-                            </select>
-                        </div>
-                        <div class="filter-group">
-                            <label>Chỉ Attacks</label>
-                            <select id="search-attacks-only" class="filter-select">
-                                <option value="">Tất cả</option>
-                                <option value="true">Chỉ Attacks</option>
-                                <option value="false">Chỉ Normal</option>
-                            </select>
-                        </div>
+                    <div class="filter-group">
+                        <label>Nguồn</label>
+                        <select id="search-source" class="filter-select"><option value="">Tất cả</option><option value="web_server">Web Server</option><option value="firewall">Firewall</option><option value="ids">IDS</option></select>
                     </div>
-                    <div class="filter-row">
-                        <div class="filter-group">
-                            <label>Từ ngày</label>
-                            <input type="datetime-local" id="search-time-from" class="filter-input">
-                        </div>
-                        <div class="filter-group">
-                            <label>Đến ngày</label>
-                            <input type="datetime-local" id="search-time-to" class="filter-input">
-                        </div>
-                        <div class="filter-group filter-actions">
-                            <button class="btn-search" id="btn-search">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-                                </svg>
-                                Tìm kiếm
-                            </button>
-                            <button class="btn-clear" id="btn-clear-search">Xóa bộ lọc</button>
-                        </div>
+                    <div class="filter-group">
+                        <label>Severity Min</label>
+                        <select id="search-severity-min" class="filter-select"><option value="">Tất cả</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Chỉ Attacks</label>
+                        <select id="search-attacks-only" class="filter-select"><option value="">Tất cả</option><option value="true">Chỉ Attacks</option><option value="false">Chỉ Normal</option></select>
+                    </div>
+                    <div class="filter-group"><label>Từ ngày</label><input type="datetime-local" id="search-time-from" class="filter-input"></div>
+                    <div class="filter-group"><label>Đến ngày</label><input type="datetime-local" id="search-time-to" class="filter-input"></div>
+                    <div class="filter-group filter-actions">
+                        <button class="btn-search" id="btn-search">Tìm kiếm</button>
+                        <button class="btn-clear" id="btn-clear-search">Xóa</button>
                     </div>
                 </div>
-
-                <!-- Search Results -->
-                <div class="search-results">
-                    <div class="results-header">
-                        <span id="search-result-count">Chưa tìm kiếm</span>
-                        <span id="search-latency"></span>
+                <div class="results-table-wrapper">
+                    <div style="padding: 10px; border-bottom: 1px solid var(--border); display:flex; justify-content: space-between;">
+                        <span id="search-result-count">Chưa tìm kiếm</span><span id="search-latency"></span>
                     </div>
-                    <div class="results-table-wrapper">
-                        <table class="results-table" id="search-results-table">
-                            <thead>
-                                <tr>
-                                    <th>Thời gian</th>
-                                    <th>Event Type</th>
-                                    <th>IP Nguồn</th>
-                                    <th>Severity</th>
-                                    <th>Nguồn</th>
-                                    <th>Message</th>
-                                    <th>Attack</th>
-                                </tr>
-                            </thead>
-                            <tbody id="search-results-body">
-                                <tr><td colspan="7" class="empty-state">Nhập bộ lọc và nhấn "Tìm kiếm" để bắt đầu</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <!-- Pagination -->
-                    <div class="pagination" id="search-pagination"></div>
+                    <table>
+                        <thead><tr><th>Thời gian</th><th>Event Type</th><th>IP Nguồn</th><th>Severity</th><th>Nguồn</th><th>Message</th><th>Attack</th></tr></thead>
+                        <tbody id="search-results-body"><tr><td colspan="7" style="text-align:center;">Nhập bộ lọc và nhấn "Tìm kiếm"</td></tr></tbody>
+                    </table>
                 </div>
+                <div class="pagination" id="search-pagination"></div>
             </div>
         </section>
 
-        <!-- ═══ Tab: Live Feed ═══ -->
+        <!-- Tab: Live Feed -->
         <section class="tab-content" id="tab-livefeed">
-            <div class="livefeed-header">
-                <div class="livefeed-controls">
-                    <button class="btn-livefeed active" id="btn-livefeed-toggle">
-                        <div class="pulse-dot"></div>
-                        <span>Live</span>
-                    </button>
-                    <select id="livefeed-limit" class="filter-select">
-                        <option value="20">20 log</option>
-                        <option value="50" selected>50 log</option>
-                        <option value="100">100 log</option>
-                    </select>
+            <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
+                <div>
+                    <button id="btn-livefeed-toggle">Bật/Tắt Live</button>
+                    <select id="livefeed-limit"><option value="20">20</option><option value="50" selected>50</option><option value="100">100</option></select>
                 </div>
-                <span class="livefeed-status" id="livefeed-status">Đang tải...</span>
+                <span id="livefeed-status">Đang tải...</span>
             </div>
-            <div class="livefeed-stream" id="livefeed-stream">
-                <!-- Log entries will be injected here -->
-            </div>
+            <div id="livefeed-stream"></div>
         </section>
 
-        <!-- ═══ Tab: Alerts ═══ -->
+        <!-- Tab: Alerts -->
         <section class="tab-content" id="tab-alerts">
             <div class="search-panel">
-                <div class="search-filters">
-                    <div class="filter-row">
-                        <div class="filter-group">
-                            <label>Trạng thái</label>
-                            <select id="alert-status-filter" class="filter-select">
-                                <option value="">Tất cả</option>
-                                <option value="pending" selected>Đang chờ xử lý (Pending)</option>
-                                <option value="investigating">Đang điều tra (Investigating)</option>
-                                <option value="resolved">Đã xử lý (Resolved)</option>
-                            </select>
-                        </div>
-                        <div class="filter-group filter-actions">
-                            <button class="btn-search" id="btn-refresh-alerts">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
-                                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-                                </svg>
-                                Làm mới
-                            </button>
-                        </div>
+                <div class="filter-row">
+                    <div class="filter-group">
+                        <label>Trạng thái</label>
+                        <select id="alert-status-filter" class="filter-select"><option value="">Tất cả</option><option value="pending" selected>Pending</option><option value="investigating">Investigating</option><option value="resolved">Resolved</option></select>
                     </div>
+                    <div class="filter-group filter-actions"><button id="btn-refresh-alerts">Làm mới</button></div>
                 </div>
-
-                <div class="search-results">
-                    <div class="results-header">
-                        <span id="alerts-count">Đang tải...</span>
-                    </div>
-                    <div class="results-table-wrapper">
-                        <table class="results-table" id="alerts-table">
-                            <thead>
-                                <tr>
-                                    <th>Thời gian</th>
-                                    <th>Trạng thái</th>
-                                    <th>IP Nguồn</th>
-                                    <th>Loại sự kiện</th>
-                                    <th>Mức độ</th>
-                                    <th>Log liên quan</th>
-                                    <th>Mô tả</th>
-                                    <th>Hành động</th>
-                                </tr>
-                            </thead>
-                            <tbody id="alerts-body">
-                                <tr><td colspan="8" class="empty-state">Đang tải cảnh báo...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
+                <div class="results-table-wrapper">
+                    <div style="padding: 10px; border-bottom: 1px solid var(--border);"><span id="alerts-count">Đang tải...</span></div>
+                    <table>
+                        <thead><tr><th>Thời gian</th><th>Trạng thái</th><th>IP Nguồn</th><th>Loại sự kiện</th><th>Mức độ</th><th>Log liên quan</th><th>Mô tả</th><th>Hành động</th></tr></thead>
+                        <tbody id="alerts-body"><tr><td colspan="8" style="text-align:center;">Đang tải...</td></tr></tbody>
+                    </table>
                 </div>
             </div>
         </section>
 
-        <!-- ═══ Tab: System ═══ -->
-        <section class="tab-content" id="tab-system">
-            <div class="system-grid">
-                <div class="system-card">
-                    <h3>Trạng thái hệ thống</h3>
-                    <div class="system-info" id="system-health-info">
-                        <div class="info-row">
-                            <span>API</span>
-                            <span class="status-badge" id="sys-api">---</span>
-                        </div>
-                        <div class="info-row">
-                            <span>Redis</span>
-                            <span class="status-badge" id="sys-redis">---</span>
-                        </div>
-                        <div class="info-row">
-                            <span>Elasticsearch</span>
-                            <span class="status-badge" id="sys-es">---</span>
-                        </div>
-                        <div class="info-row">
-                            <span>ES Version</span>
-                            <span id="sys-es-ver">---</span>
-                        </div>
-                        <div class="info-row">
-                            <span>Tổng Log Indexed</span>
-                            <span id="sys-total-indexed">---</span>
-                        </div>
-                        <div class="info-row">
-                            <span>Index Size</span>
-                            <span id="sys-index-size">---</span>
-                        </div>
-                        <div class="info-row">
-                            <span>Redis Queue Length</span>
-                            <span id="sys-queue-len">---</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="system-card">
-                    <h3>Performance Metrics</h3>
-                    <div class="system-info" id="system-metrics-info">
-                        <div class="info-row">
-                            <span>Uptime</span>
-                            <span id="sys-uptime">---</span>
-                        </div>
-                        <div class="info-row">
-                            <span>Total Ingested</span>
-                            <span id="sys-ingested">---</span>
-                        </div>
-                        <div class="info-row">
-                            <span>Total Queries</span>
-                            <span id="sys-queries">---</span>
-                        </div>
-                        <div class="info-row">
-                            <span>Avg Ingest Rate</span>
-                            <span id="sys-ingest-rate">---</span>
-                        </div>
-                        <div class="info-row">
-                            <span>Last Batch Rate</span>
-                            <span id="sys-batch-rate">---</span>
-                        </div>
-                        <div class="info-row">
-                            <span>Last Query Latency</span>
-                            <span id="sys-query-latency">---</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
+
     </main>
 
     <script src="app.js"></script>
