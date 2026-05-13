@@ -1,5 +1,5 @@
 services:
-  # 0. Nạp Index Template (Composable) trước khi Logstash/API tạo index siem-logs-*
+  # 0. Nạp Index Template trước khi Logstash/API tạo index siem-logs-*
   es-bootstrap:
     image: curlimages/curl:8.5.0
     entrypoint: ["/bin/sh", "-c"]
@@ -102,6 +102,59 @@ services:
       - api-collector
     restart: unless-stopped
 
+  # ─────────────── NGUỒN LOG THỰC TẾ ─────────────────────────────
+
+  # 7. Web Server thực - Nginx (sinh access log thật)
+  #    Truy cập: http://localhost:8080
+  nginx-target:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./log_sources/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - nginx_logs:/var/log/nginx
+    restart: unless-stopped
+
+  # 8. ModSecurity WAF - Tường lửa/IDS thực (OWASP CRS)
+  #    Truy cập qua WAF: http://localhost:8443
+  #    Thử tấn công:     curl "http://localhost:8443/?id=1 UNION SELECT *"
+  modsecurity-waf:
+    image: owasp/modsecurity-crs:nginx-alpine
+    ports:
+      - "8443:8080"
+    environment:
+      - BACKEND=http://nginx-target:80
+      - MODSEC_AUDIT_ENGINE=On
+      - MODSEC_AUDIT_LOG=/var/log/modsec/audit.log
+      - MODSEC_AUDIT_LOG_FORMAT=JSON
+      - MODSEC_AUDIT_LOG_TYPE=Serial
+      - PORT=8080
+      - MODSEC_RULE_ENGINE=On
+    volumes:
+      - modsec_logs:/var/log/modsec
+    depends_on:
+      - nginx-target
+    restart: unless-stopped
+
+  # 9. Log Collector - Parse log từ Nginx & ModSecurity → gửi SIEM API
+  log-collector:
+    build: ./log_sources
+    environment:
+      - API_URL=http://api-collector:8000
+      - BATCH_INTERVAL=5
+    volumes:
+      - nginx_logs:/var/log/nginx:ro       # đọc Nginx log (readonly)
+      - modsec_logs:/var/log/modsec:ro     # đọc ModSecurity log (readonly)
+    depends_on:
+      - api-collector
+      - nginx-target
+      - modsecurity-waf
+    restart: unless-stopped
+
 volumes:
   es_data:
+    driver: local
+  nginx_logs:       # Shared volume: Nginx ghi → Collector đọc
+    driver: local
+  modsec_logs:      # Shared volume: ModSecurity ghi → Collector đọc
     driver: local

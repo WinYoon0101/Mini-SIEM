@@ -167,7 +167,6 @@ function initNavigation() {
         search: 'Tìm kiếm Log',
         livefeed: 'Live Feed',
         alerts: 'Cảnh báo',
-        system: 'Hệ thống',
     };
 
     navItems.forEach(item => {
@@ -191,7 +190,6 @@ function initNavigation() {
 
             // Trigger data load based on tab
             if (tab === 'dashboard') loadDashboard();
-            if (tab === 'system') loadSystemInfo();
             if (tab === 'livefeed') loadLiveFeed();
             if (tab === 'alerts') loadAlerts();
         });
@@ -727,18 +725,10 @@ function renderPagination(total, currentPage, totalPages) {
 // ═══════════════════════════════════════════════════════════════
 
 function initLiveFeed() {
-    const toggleBtn = document.getElementById('btn-livefeed-toggle');
-    toggleBtn.addEventListener('click', () => {
-        state.liveFeedActive = !state.liveFeedActive;
-        toggleBtn.classList.toggle('paused', !state.liveFeedActive);
-
-        if (state.liveFeedActive) {
-            loadLiveFeed();
-            startLiveFeedPolling();
-        } else {
-            stopLiveFeedPolling();
-        }
-    });
+    const limitSelect = document.getElementById('livefeed-limit');
+    if (limitSelect) {
+        limitSelect.addEventListener('change', loadLiveFeed);
+    }
 }
 
 async function loadLiveFeed() {
@@ -900,52 +890,6 @@ window.resolveAlert = async function(alertId) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  System Info
-// ═══════════════════════════════════════════════════════════════
-
-async function loadSystemInfo() {
-    // Health
-    const health = await apiFetch('/health');
-    if (health) {
-        setStatusBadge('sys-api', health.api);
-        setStatusBadge('sys-redis', health.redis);
-        setStatusBadge('sys-es', health.elasticsearch);
-        document.getElementById('sys-es-ver').textContent = health.es_version || '—';
-        document.getElementById('sys-total-indexed').textContent = formatNumber(health.total_indexed_logs || 0);
-        document.getElementById('sys-index-size').textContent = `${health.index_size_mb || 0} MB`;
-        document.getElementById('sys-queue-len').textContent = formatNumber(health.redis_queue_length || 0);
-
-        // Update sidebar status
-        const statusDot = document.querySelector('.system-status .status-dot');
-        const statusText = document.querySelector('.system-status span');
-        if (health.overall === 'ok') {
-            statusDot.className = 'status-dot ok';
-            statusText.textContent = 'Hệ thống hoạt động';
-        } else {
-            statusDot.className = 'status-dot error';
-            statusText.textContent = 'Hệ thống lỗi';
-        }
-    }
-
-    // Metrics
-    const metrics = await apiFetch('/metrics');
-    if (metrics && metrics.status === 'success') {
-        document.getElementById('sys-uptime').textContent = formatUptime(metrics.uptime_seconds || 0);
-        document.getElementById('sys-ingested').textContent = formatNumber(metrics.total_ingested || 0);
-        document.getElementById('sys-queries').textContent = formatNumber(metrics.total_queries || 0);
-        document.getElementById('sys-ingest-rate').textContent = `${metrics.avg_ingest_rate_per_second || 0} logs/s`;
-        document.getElementById('sys-batch-rate').textContent = `${metrics.last_batch_ingest_rate || 0} logs/s`;
-        document.getElementById('sys-query-latency').textContent = `${metrics.last_query_latency_ms || 0} ms`;
-    }
-}
-
-function setStatusBadge(id, status) {
-    const el = document.getElementById(id);
-    el.textContent = status || '—';
-    el.className = `status-badge ${status || 'unknown'}`;
-}
-
-// ═══════════════════════════════════════════════════════════════
 //  Auto Refresh
 // ═══════════════════════════════════════════════════════════════
 
@@ -954,7 +898,6 @@ function startAutoRefresh() {
     state.intervals.autoRefresh = setInterval(() => {
         if (!state.autoRefresh) return;
         if (state.currentTab === 'dashboard') loadDashboard();
-        if (state.currentTab === 'system') loadSystemInfo();
     }, REFRESH_INTERVAL);
 }
 
@@ -974,7 +917,7 @@ function initRefreshBtn() {
         dashboard: loadDashboard,
         search: performSearch,
         livefeed: loadLiveFeed,
-        system: loadSystemInfo,
+        alerts: loadAlerts,
     };
     document.getElementById('refresh-btn').addEventListener('click', () => {
         tabLoaders[state.currentTab]?.();
@@ -998,7 +941,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initial load
     loadDashboard();
-    loadSystemInfo();
 
     // Start polling
     startAutoRefresh();
