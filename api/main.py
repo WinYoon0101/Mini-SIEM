@@ -160,6 +160,7 @@ def _enrich_log(data: dict) -> dict:
             "malware_detected": "ids",
             "dos_attack": "firewall",
         }
+        # Giữ nguyên source nếu đã được set (ví dụ: "endpoint" từ Windows agent)
         data["source"] = event_source_map.get(data.get("event_type"), "unknown")
 
     return data
@@ -294,7 +295,10 @@ async def correlation_engine():
                                 es_client.update,
                                 index=ES_ALERT_INDEX, 
                                 id=alert_id, 
-                                body={"script": {"source": "ctx._source.related_logs += params.count", "params": {"count": count}}}
+                                body={"script": {
+                                    "source": "ctx._source.related_logs += params.count; if (ctx._source.related_logs > 5) { ctx._source.severity = 'high' }",
+                                    "params": {"count": count}
+                                }}
                             )
                         else:
                             alert_doc = {
