@@ -15,6 +15,50 @@ Mục tiêu vận hành tham chiếu:
 
 ---
 
+## 1B. Đối chiếu đặc tả yêu cầu & nghiệm thu (bắt buộc)
+
+Bảng dưới đây map trực tiếp **Đặc tả yêu cầu & đánh giá bắt buộc** của đề tài với triển khai hiện tại và tài liệu/chứng cứ trong repo. Mục đích: hội đồng có thể đối chiếu nhanh từng dòng yêu cầu.
+
+### 1B.1. Yêu cầu chức năng (Functional)
+
+| Yêu cầu | Đáp ứng? | Cách triển khai / chứng cứ |
+|--------|----------|----------------------------|
+| **Thu thập đa nguồn:** ít nhất **Web Server**, **Firewall**, **IDS** | **Có** | **(1) Web Server:** service `nginx-target` + access log JSON → `log_sources/collector.py` → `POST /ingest/batch` (`event_type` thường là `web_access` / nâng cấp `ids_alert` khi phát hiện pattern). **(2) Firewall / chặn:** log ModSecurity OWASP CRS (chặn, tường lửa ứng dụng) → cùng collector → `firewall_block` / tương đương. **(3) IDS:** cùng luồng ModSecurity (phát hiện xâm nhập) + phân loại `ids_alert`; bổ sung **endpoint** qua `scripts/win_event_agent.py` (login, v.v.). Bảng nguồn vận hành: `README.md`. |
+| **Truy vấn & phân tích:** lọc theo **thời gian**, **IP**, **loại sự kiện** | **Có** | `GET /search` với `time_from`, `time_to`, `src_ip`, `dest_ip`, `event_type` (+ mở rộng: `severity_*`, `source`, `is_attack`, full-text `q`). Mô tả đầy đủ: mục **6.3** dưới đây. |
+| **Dashboard:** tổng quan + **thống kê tấn công theo thời gian** | **Có** | Dashboard HTTP (Nginx phục vụ static tại cổng **3000**, `dashboard/`): gọi `GET /stats` (timeline + `attacks` trong từng bucket), biểu đồ attack / severity / top IP; Live Feed `GET /recent`; tab Alerts. |
+
+### 1B.2. Hạn chế kỹ thuật & phi chức năng (NFR)
+
+| Yêu cầu | Đáp ứng? | Cách triển khai / chứng cứ |
+|--------|----------|----------------------------|
+| **Quy mô ≥ 1.000.000 log**, truy vấn ổn định | **Có (theo kịch bản kiểm thử)** | Elasticsearch lưu `siem-logs-*`; index template cố định mapping; tách index theo ngày. **Chứng minh số lượng:** `GET /health` → `total_indexed_logs`; script `scripts/stress_test.py` (mục tiêu ≥ 1M). Hướng dẫn: `TEST_GUIDE.md`. |
+| **Pipeline bất đồng bộ + queue/buffer**, tránh nghẽn cổ chai ingest | **Có** | **API** nhận log → **Redis** `log_queue` (LPUSH) → **Logstash** tiêu thụ list (BRPOP) → bulk **Elasticsearch**. Kiến trúc: mục **2**, luồng: mục **3**. |
+
+### 1B.3. Triển khai & tài liệu (Implementation & Documentation)
+
+| Thành phần tài liệu | Đáp ứng? | Vị trí trong repo / ghi chú |
+|---------------------|----------|------------------------------|
+| **Thiết kế hệ thống:** sơ đồ kiến trúc | **Có** | Mục **2** (ASCII), `docker-compose.yml` (stack thực tế). |
+| **Luồng tương tác** sinh log → nạp → lưu trữ → hiển thị | **Có** | Mục **3.1**. |
+| **Scale-out** khi log tăng đột biến | **Có** | Mục **7**. |
+| **Thiết kế CSDL:** schema log thô / log phân tích | **Một phần (đủ cho báo cáo có lập luận)** | **Một document** gộp `message` (gần thô) + trường đã chuẩn hóa/enrich (phân tích): mục **3.2**, bảng trường mục **4.2**. Phương án tách index `siem-raw-*` / `siem-logs-*` ghi trong **3.2** nếu hội đồng yêu cầu tách vật lý. |
+| **Chiến lược indexing** (bắt buộc cho tìm kiếm trên triệu dòng) | **Có** | Mục **5** + file `elasticsearch/index-templates/siem-logs-template.json`; tài liệu bổ sung `docs/CHIEN_LUOC_INDEXING.md`. |
+| **Đặc tả API** REST (ingest + JSON) | **Có** | Mục **6**; OpenAPI tương tác: `http://localhost:8000/docs`. |
+| **Backend:** Log Collector API + Indexing Service | **Có** | **API:** `api/main.py` (FastAPI). **Indexing:** Logstash (`logstash/pipeline/logstash.conf`) + bootstrap template (`es-bootstrap` trong `docker-compose.yml`) + Elasticsearch — không tách microservice riêng nhưng đúng vai trò “dịch vụ chỉ mục” trong pipeline. |
+| **Frontend:** Dashboard visualization | **Có** | `dashboard/` (HTML/CSS/JS), cổng 3000. |
+
+### 1B.4. Tiêu chí đánh giá hiệu năng (Performance Evaluation)
+
+| Tiêu chí | Đáp ứng? | Cách đo / artifact |
+|-----------|----------|-------------------|
+| **Load testing** (lượng lớn log đồng thời) | **Có** | `scripts/stress_test.py` — concurrent workers + batch; hướng dẫn `TEST_GUIDE.md` §4 / checklist. |
+| **Ingestion throughput (EPS)** | **Có** | Phản hồi `POST /ingest/batch`: `rate_per_second`, `elapsed_seconds`; `GET /metrics` → `last_batch_ingest_rate`, `avg_ingest_rate_per_second`. |
+| **Query latency** (tìm kiếm/lọc phức tạp trên ≥ 1M bản ghi, mức chấp nhận được) | **Có (định lượng theo kịch bản)** | `GET /search`, `GET /stats` trả `query_latency_ms`; script `scripts/benchmark_query_latency.py` (p50 / p95 / p99). Ngưỡng tham chiếu gợi ý trong `TEST_GUIDE.md` (ví dụ &lt; 500ms simple, &lt; 1s aggregation — tùy phần cứng lab). |
+
+**Kết luận ngắn:** Hệ thống hiện tại **đáp ứng đủ các nhóm yêu cầu bắt buộc** trong đặc tả (chức năng, pipeline + scale 1M, tài liệu thiết kế + API, công cụ đo throughput/latency). Điểm cần **trình bày rõ khi bảo vệ:** “log thô vs log phân tích” đang là **một lớp document** có cả hai khía cạnh; nếu giảng viên bắt **hai index tách biệt**, có thể triển khai theo phương án B tại mục 3.2 (roadmap).
+
+---
+
 ## 2. Kiến trúc tổng thể
 
 ```
@@ -116,7 +160,7 @@ Hệ thống dùng **Elasticsearch Composable Index Template** tên `siem-logs`,
 ### 5.3. Tham số index
 
 - `number_of_shards: 1`, `number_of_replicas: 0`: phù hợp **single-node** trong môi trường lab.
-- `refresh_interval: 30s`: đã được tăng lên 30s để tối đa hóa Ingestion Throughput, gộp các bulk request thành các segments lớn.
+- `refresh_interval` (trong `elasticsearch/index-templates/siem-logs-template.json`): mặc định triển khai **lab / test nguồn thật** dùng **`1s`** để log vào ES nhanh có thể search trên Dashboard (đánh đổi một phần throughput bulk so với refresh rất chậm). Khi cần **tối đa hóa EPS** (stress 1M+), có thể tạm chỉnh lên **`30s`** trên template hoặc `PUT .../_settings` theo index đang thử — Correlation Engine lùi mốc `time_to` so với `now` tương ứng cấu hình refresh + batch collector (xem `api/main.py`).
 
 ### 5.4. Kiểm tra nhanh sau khi khởi động
 
@@ -330,7 +374,7 @@ GET /search?event_type=ids_alert&severity_min=4&is_attack=true&size=20
 
 ---
 
-### 6.5. `GET /health` — Kiểm tra trạng thái hệ thống
+### 6.6. `GET /health` — Kiểm tra trạng thái hệ thống
 
 **Response 200:**
 
@@ -350,7 +394,7 @@ GET /search?event_type=ids_alert&severity_min=4&is_attack=true&size=20
 
 ---
 
-### 6.6. `GET /metrics` — Số liệu hiệu năng API
+### 6.7. `GET /metrics` — Số liệu hiệu năng API
 
 **Response 200:**
 
@@ -390,7 +434,7 @@ Khi khối lượng log tăng đột biến, có thể mở rộng theo từng l
 | Nạp template khi `docker compose up` | `docker-compose.yml` → service `es-bootstrap` |
 | Pipeline Logstash | `logstash/pipeline/logstash.conf` |
 | API & truy vấn ES | `api/main.py` |
-| Kiểm thử throughput / latency | `stress_test.py`, `benchmark_query_latency.py` (p50/p95/p99), `TEST_GUIDE.md` |
+| Kiểm thử throughput / latency | `scripts/stress_test.py`, `scripts/benchmark_query_latency.py` (p50/p95/p99), `TEST_GUIDE.md` |
 
 ---
 

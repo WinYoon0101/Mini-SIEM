@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nova Store - Premium Electronics</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <i class="fas fa-bolt"></i>
+                <span>NOVA STORE</span>
+            </div>
+            <div class="nav-search">
+                <input type="text" id="search-input" placeholder="Tìm kiếm sản phẩm...">
+                <button id="btn-search"><i class="fas fa-search"></i></button>
+            </div>
+            <div class="nav-actions">
+                <a href="#" id="nav-login"><i class="far fa-user"></i> Đăng nhập</a>
+                <a href="#" class="cart-icon"><i class="fas fa-shopping-cart"></i><span class="cart-count">0</span></a>
+            </div>
+        </div>
+    </nav>
+
+    <header class="hero">
+        <div class="hero-content">
+            <span class="badge">Sản phẩm mới 2024</span>
+            <h1>Định nghĩa lại trải nghiệm công nghệ</h1>
+            <p>Khám phá bộ sưu tập thiết bị cao cấp nhất từ Nova Store. Hiệu năng vượt trội, thiết kế tinh tế.</p>
+            <div class="hero-btns">
+                <button class="btn btn-primary">Mua ngay</button>
+                <button class="btn btn-outline">Xem thêm</button>
+            </div>
+        </div>
+        <div class="hero-image">
+            <img src="https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?q=80&w=800&auto=format&fit=crop" alt="Smart Device">
+        </div>
+    </header>
+
+    <main class="container">
+        <section class="section">
+            <div class="section-header">
+                <h2>Sản phẩm nổi bật</h2>
+                <a href="#">Xem tất cả <i class="fas fa-arrow-right"></i></a>
+            </div>
+            <div class="product-grid">
+                <!-- Product 1 -->
+                <div class="product-card">
+                    <div class="product-img">
+                        <img src="https://images.unsplash.com/photo-1592899677977-9c10ca588bbd?q=80&w=500&auto=format&fit=crop" alt="iPhone 15">
+                        <button class="add-to-cart" data-id="1">Thêm vào giỏ</button>
+                    </div>
+                    <div class="product-info">
+                        <h3>iPhone 15 Pro Max</h3>
+                        <p class="category">Mobile</p>
+                        <p class="price">29,990,000₫</p>
+                    </div>
+                </div>
+                <!-- Product 2 -->
+                <div class="product-card">
+                    <div class="product-img">
+                        <img src="https://images.unsplash.com/photo-1517336714731-489689fd1ca8?q=80&w=500&auto=format&fit=crop" alt="MacBook">
+                        <button class="add-to-cart" data-id="2">Thêm vào giỏ</button>
+                    </div>
+                    <div class="product-info">
+                        <h3>MacBook Pro M3</h3>
+                        <p class="category">Laptop</p>
+                        <p class="price">45,500,000₫</p>
+                    </div>
+                </div>
+                <!-- Product 3 -->
+                <div class="product-card">
+                    <div class="product-img">
+                        <img src="https://images.unsplash.com/photo-1546435770-a3e4265da3fd?q=80&w=500&auto=format&fit=crop" alt="Sony Headphones">
+                        <button class="add-to-cart" data-id="3">Thêm vào giỏ</button>
+                    </div>
+                    <div class="product-info">
+                        <h3>Sony WH-1000XM5</h3>
+                        <p class="category">Audio</p>
+                        <p class="price">8,490,000₫</p>
+                    </div>
+                </div>
+                <!-- Product 4 -->
+                <div class="product-card">
+                    <div class="product-img">
+                        <img src="https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?q=80&w=500&auto=format&fit=crop" alt="iPad">
+                        <button class="add-to-cart" data-id="4">Thêm vào giỏ</button>
+                    </div>
+                    <div class="product-info">
+                        <h3>iPad Pro M2</h3>
+                        <p class="category">Tablet</p>
+                        <p class="price">22,190,000₫</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Hidden Login Modal (Normal looking) -->
+    <div class="modal" id="login-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Đăng nhập</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group">
+                    <label>Tên đăng nhập</label>
+                    <input type="text" id="login-user" placeholder="username">
+                </div>
+                <div class="input-group">
+                    <label>Mật khẩu</label>
+                    <input type="password" id="login-pass" placeholder="••••••••">
+                </div>
+                <button class="btn btn-primary full-width" id="btn-do-login">Đăng nhập</button>
+                <div class="auth-links">
+                    <a href="#">Quên mật khẩu?</a>
+                    <span>Chưa có tài khoản? <a href="#">Đăng ký</a></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dev Tool / Testing Tool (Hidden by default, triggered by key shortcut or footer) -->
+    <div class="dev-tools" id="dev-tools">
+        <div class="dev-header">
+            <h4>Security Testing Tools</h4>
+            <button id="close-dev">×</button>
+        </div>
+        <div class="dev-body">
+            <button id="sim-sqli" class="btn-dev">Simulate SQL Injection</button>
+            <button id="sim-xss" class="btn-dev">Simulate XSS</button>
+            <button id="sim-portscan" class="btn-dev">Simulate Port Scan</button>
+            <button id="sim-dos" class="btn-dev">Simulate DoS</button>
+            <button id="sim-malware" class="btn-dev">Simulate Malware Upload</button>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-grid">
+                <div class="footer-info">
+                    <div class="nav-brand">
+                        <i class="fas fa-bolt"></i>
+                        <span>NOVA STORE</span>
+                    </div>
+                    <p>Hệ thống bán lẻ công nghệ hàng đầu với dịch vụ bảo hành tận tâm.</p>
+                </div>
+                <div class="footer-links">
+                    <h4>Về chúng tôi</h4>
+                    <ul>
+                        <li><a href="#">Giới thiệu</a></li>
+                        <li><a href="#">Tuyển dụng</a></li>
+                        <li><a href="#">Chính sách bảo mật</a></li>
+                    </ul>
+                </div>
+                <div class="footer-links">
+                    <h4>Hỗ trợ</h4>
+                    <ul>
+                        <li><a href="#">Trung tâm trợ giúp</a></li>
+                        <li><a href="#">Vận chuyển</a></li>
+                        <li><a href="#" id="open-testing-tools">Chế độ kiểm thử</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 Nova Store. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <div class="toast-container" id="toast-container"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>

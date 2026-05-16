@@ -859,7 +859,7 @@ function renderAlerts(alerts) {
         }
 
         return `
-            <tr>
+            <tr id="alert-row-${alert._id}">
                 <td>${formatTimestamp(alert.timestamp)}</td>
                 <td><span class="status-badge status-${statusClass}">${statusText}</span></td>
                 <td><span class="log-ip">${alert.src_ip}</span></td>
@@ -867,7 +867,7 @@ function renderAlerts(alerts) {
                 <td><span class="severity-badge severity-${alert.severity === 'high' ? '5' : '3'}">${alert.severity}</span></td>
                 <td>${alert.related_logs}</td>
                 <td>Phát hiện ${alert.related_logs} sự kiện ${alert.event_type} từ ${alert.src_ip}</td>
-                <td>${actionBtn}</td>
+                <td class="action-cell">${actionBtn}</td>
             </tr>
         `;
     }).join('');
@@ -876,15 +876,46 @@ function renderAlerts(alerts) {
 window.resolveAlert = async function(alertId) {
     if (!confirm('Xác nhận đánh dấu cảnh báo này là đã xử lý?')) return;
     
+    const row = document.getElementById(`alert-row-${alertId}`);
+    const btn = row?.querySelector('.btn-resolve');
+    const badge = row?.querySelector('.status-badge');
+    const actionCell = row?.querySelector('.action-cell');
+    
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Đang xử lý...';
+    }
+
     const res = await apiFetch(`/alerts/${alertId}`, {
         method: 'PATCH',
         body: JSON.stringify({ status: 'resolved' })
     });
     
     if (res && res.status === 'success') {
-        loadAlerts();
+        // Cập nhật UI ngay lập tức (Optimistic Update)
+        if (badge) {
+            badge.className = 'status-badge status-resolved';
+            badge.textContent = 'RESOLVED';
+        }
+        if (actionCell) {
+            actionCell.innerHTML = '<span style="color: var(--text-muted); opacity: 0.6;">Đã xử lý</span>';
+        }
+        
+        // Thêm hiệu ứng flash nhẹ để báo hiệu thành công
+        if (row) {
+            row.style.backgroundColor = 'rgba(16, 185, 129, 0.1)';
+            setTimeout(() => {
+                row.style.transition = 'background-color 1s ease';
+                row.style.backgroundColor = 'transparent';
+            }, 500);
+        }
+
         updateAlertBadge();
     } else {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Đánh dấu đã xử lý';
+        }
         alert('Lỗi cập nhật cảnh báo');
     }
 }
@@ -925,6 +956,49 @@ function initRefreshBtn() {
 }
 
 // ═══════════════════════════════════════════════════════════════
+//  Telegram Toggle
+// ═══════════════════════════════════════════════════════════════
+
+function _updateTgToggleUI(enabled) {
+    const toggle = document.getElementById('tg-enabled-toggle');
+    const label = document.getElementById('tg-toggle-label');
+    if (!toggle || !label) return;
+    toggle.checked = enabled;
+    label.textContent = enabled ? 'BẬT' : 'TẮT';
+    label.className = 'tg-toggle-label' + (enabled ? ' on' : '');
+}
+
+async function loadTelegramStatus() {
+    const data = await apiFetch('/telegram/status');
+    if (!data) return;
+    _updateTgToggleUI(data.enabled);
+}
+
+function initSettings() {
+    const toggle = document.getElementById('tg-enabled-toggle');
+    if (toggle) {
+        toggle.addEventListener('change', async () => {
+            const enabled = toggle.checked;
+            _updateTgToggleUI(enabled);
+
+            const res = await apiFetch('/telegram/toggle', {
+                method: 'PATCH',
+                body: JSON.stringify({ enabled }),
+            });
+
+            if (!res || res.status !== 'success') {
+                console.error("Lỗi cập nhật trạng thái Telegram");
+                // Revert
+                toggle.checked = !enabled;
+                _updateTgToggleUI(!enabled);
+            }
+        });
+    }
+
+    loadTelegramStatus();
+}
+
+// ═══════════════════════════════════════════════════════════════
 //  Init
 // ═══════════════════════════════════════════════════════════════
 
@@ -938,6 +1012,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initLiveFeed();
     initAlerts();
     initRefreshBtn();
+    initSettings();
 
     // Initial load
     loadDashboard();
