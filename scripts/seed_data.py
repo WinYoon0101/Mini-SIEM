@@ -1,7 +1,8 @@
 """
 Mini SIEM - Seed Data Generator
 Tạo dữ liệu mẫu (20-100 log) để test dashboard nhanh.
-Sử dụng: python seed_data.py [số_lượng]
+pip install requests
+Sử dụng: python scripts/seed_data.py [số_lượng]
 """
 
 import requests

@@ -125,6 +125,14 @@
                         <select id="alert-status-filter" class="filter-select"><option value="">Tất cả</option><option value="pending" selected>Pending</option><option value="investigating">Investigating</option><option value="resolved">Resolved</option></select>
                     </div>
                     <div class="filter-group filter-actions"><button id="btn-refresh-alerts">Làm mới</button></div>
+                    <div class="tg-toggle-wrapper" style="margin-left: auto;">
+                        <span class="tg-toggle-label" id="tg-toggle-label">TẮT</span>
+                        <label class="toggle-switch" title="Bật/tắt thông báo Telegram">
+                            <input type="checkbox" id="tg-enabled-toggle">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span style="font-size: 0.8rem; color: var(--muted); margin-left: 8px;">Telegram Bot</span>
+                    </div>
                 </div>
                 <div class="results-table-wrapper">
                     <div style="padding: 10px; border-bottom: 1px solid var(--border);"><span id="alerts-count">Đang tải...</span></div>

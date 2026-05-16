@@ -102,8 +102,6 @@ services:
       - api-collector
     restart: unless-stopped
 
-  # ─────────────── NGUỒN LOG THỰC TẾ ─────────────────────────────
-
   # 7. Web Server thực - Nginx (sinh access log thật)
   #    Truy cập: http://localhost:8080
   nginx-target:
@@ -112,6 +110,9 @@ services:
       - "8080:80"
     volumes:
       - ./log_sources/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./web_app_target/index.html:/usr/share/nginx/html/index.html
+      - ./web_app_target/style.css:/usr/share/nginx/html/style.css
+      - ./web_app_target/app.js:/usr/share/nginx/html/app.js
       - nginx_logs:/var/log/nginx
     restart: unless-stopped
 
@@ -132,6 +133,7 @@ services:
       - MODSEC_RULE_ENGINE=On
     volumes:
       - modsec_logs:/var/log/modsec
+      - ./log_sources/99-fix-perms.sh:/docker-entrypoint.d/99-fix-perms.sh:ro
     depends_on:
       - nginx-target
     restart: unless-stopped

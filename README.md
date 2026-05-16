@@ -36,6 +36,8 @@ http://localhost:3000
 # 3. Tạo traffic thực vào Nginx (Web Server log)
 curl http://localhost:8080/
 
+curl "http://localhost:8080/search?q=laptop"
+
 # 4. Thử tấn công qua WAF để sinh IDS/Firewall alert
 # Tạp file chứa log
 docker exec -u 0 mini-siem-modsecurity-waf-1 sh -c "mkdir -p /var/log/modsec && touch /var/log/modsec/audit.log && chmod -R 777 /var/log/modsec"
@@ -118,13 +120,13 @@ mini-siem/
 │   └── Dockerfile
 ├── logstash/
 │   └── pipeline/logstash.conf
-├── log_sources/                   # ← MỚI: Agent thu thập log thực
+├── log_sources/                   #  Agent thu thập log thực
 │   ├── collector.py               # Parse Nginx + ModSecurity log
 │   ├── nginx.conf                 # Nginx JSON log format
 │   ├── Dockerfile
 │   └── requirements.txt
 ├── scripts/
-│   ├── win_event_agent.py         # ← MỚI: Windows Event Log agent
+│   ├── win_event_agent.py         #  Windows Event Log agent
 │   ├── seed_data.py
 │   ├── stress_test.py
 │   └── benchmark_query_latency.py

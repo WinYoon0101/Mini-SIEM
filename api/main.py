@@ -8,15 +8,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from enum import Enum
-from datetime import datetime
+from datetime import datetime, timedelta
 from elasticsearch import Elasticsearch
+from elasticsearch.helpers import bulk
 import redis
 import json
 import time
 import logging
 import asyncio
-import uuid
-from datetime import datetime, timedelta
+import httpx
 
 # ──────────────────────────── Config ────────────────────────────
 
@@ -94,7 +94,36 @@ class AlertUpdate(BaseModel):
     status: str = Field(..., description="Trạng thái: pending, investigating, resolved")
 
 
+class TelegramToggle(BaseModel):
+    """Schema bật/tắt Telegram notification"""
+    enabled: bool = Field(..., description="True = bật, False = tắt")
+
+
 # ──────────────────────────── Helpers ────────────────────────────
+
+# Heuristic nhẹ (substring) — một lần quét message, không regex nặng trên đường ingest nóng
+_MSG_PATTERN_KEYWORDS = (
+    (("sql injection", "sqli", "union select", "or 1=1", "'1'='1", "1=1"), "sql_injection"),
+    (("xss", "cross-site", "<script", "javascript:"), "xss"),
+    (
+        (
+            "brute force",
+            "failed login",
+            "multiple failed",
+            "authentication failure",
+            "invalid password",
+            "bad password",
+            "login failed",
+        ),
+        "brute_force",
+    ),
+    (("port scan", "nmap", "syn scan"), "port_scan"),
+    (("dos", "ddos", "flood"), "dos_attack"),
+    (("malware", "trojan", "ransomware", "virus"), "malware"),
+    (("../..", "etc/passwd", "path traversal"), "path_traversal"),
+    (("cmd.exe", "/bin/bash", "/bin/sh", "command injection"), "command_injection"),
+)
+
 
 def _enrich_log(data: dict) -> dict:
     """Thêm metadata vào log entry trước khi đẩy vào queue"""
@@ -117,18 +146,9 @@ def _enrich_log(data: dict) -> dict:
     # Detect attack patterns from message
     msg = (data.get("message") or "").lower()
     attack_patterns = []
-    if any(kw in msg for kw in ["sql injection", "sqli", "union select", "or 1=1"]):
-        attack_patterns.append("sql_injection")
-    if any(kw in msg for kw in ["xss", "cross-site", "<script"]):
-        attack_patterns.append("xss")
-    if any(kw in msg for kw in ["brute force", "failed login", "multiple failed"]):
-        attack_patterns.append("brute_force")
-    if any(kw in msg for kw in ["port scan", "nmap", "syn scan"]):
-        attack_patterns.append("port_scan")
-    if any(kw in msg for kw in ["dos", "ddos", "flood"]):
-        attack_patterns.append("dos_attack")
-    if any(kw in msg for kw in ["malware", "trojan", "ransomware", "virus"]):
-        attack_patterns.append("malware")
+    for keywords, label in _MSG_PATTERN_KEYWORDS:
+        if any(kw in msg for kw in keywords) and label not in attack_patterns:
+            attack_patterns.append(label)
 
     # Sự kiện tấn công theo loại nhưng message không khớp từ khóa heuristic ở trên
     # (vd. DNS tunneling, chặn C2 không chứa "malware"...) — vẫn cần nhãn cho thống kê/dashboard.
@@ -171,6 +191,79 @@ def _push_to_queue(log_data: dict):
     redis_client.lpush("log_queue", json.dumps(log_data))
 
 
+# ──────────────────────────── Telegram Service ────────────────────────────
+
+# Token và Chat ID được cấu hình cố định — chỉ cần toggle bật/tắt
+TELEGRAM_BOT_TOKEN = "7705759574:AAEuMhPruPbYH0RmUny8Ai1DDP9JG7j-Bq0"
+TELEGRAM_CHAT_ID = "7500935010"
+TELEGRAM_ENABLED_KEY = "telegram_enabled"
+
+
+def _is_telegram_enabled() -> bool:
+    """Kiểm tra Telegram notification có đang bật không (lưu trong Redis)."""
+    try:
+        val = redis_client.get(TELEGRAM_ENABLED_KEY)
+        # Mặc định bật (None = chưa set = bật)
+        return val != "false"
+    except Exception:
+        return True
+
+
+async def _send_telegram_message(message: str) -> bool:
+    """
+    Gửi tin nhắn đến Telegram chat (hardcoded bot + chat_id).
+    Trả về True nếu thành công, False nếu tắt hoặc thất bại.
+    """
+    if not _is_telegram_enabled():
+        return False
+
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": TELEGRAM_CHAT_ID,
+        "text": message,
+        "parse_mode": "HTML",
+        "disable_web_page_preview": True,
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(url, json=payload)
+            if resp.status_code == 200:
+                return True
+            else:
+                logger.warning(f"Telegram API error {resp.status_code}: {resp.text[:200]}")
+                return False
+    except Exception as e:
+        logger.error(f"Lỗi gửi Telegram: {e}")
+        return False
+
+
+async def _notify_new_alert(src_ip: str, event_type: str, count: int, severity: str):
+    """Gửi thông báo Telegram khi phát hiện alert mới."""
+    severity_emoji = {
+        "critical": "🔴",
+        "high": "🟠",
+        "medium": "🟡",
+        "low": "🟢",
+    }.get(severity, "⚪")
+
+    event_label = event_type.replace("_", " ").upper()
+    now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+
+    message = (
+        f"{severity_emoji} <b> MINI SIEM ALERT</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f" <b>Loại tấn công:</b> {event_label}\n"
+        f" <b>IP nguồn:</b> <code>{src_ip}</code>\n"
+        f" <b>Mức độ:</b> {severity.upper()}\n"
+        f" <b>Số sự kiện:</b> {count}\n"
+        f" <b>Thời gian:</b> {now_str}\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"Phát hiện <b>{count}</b> sự kiện <b>{event_label}</b> từ IP <code>{src_ip}</code>"
+    )
+    await _send_telegram_message(message)
+
+
 # ES_INDEX_PATTERN được định nghĩa ở phần Config phía trên
 
 
@@ -179,6 +272,7 @@ def _push_to_queue(log_data: dict):
 async def correlation_engine():
     """
     Background task phân tích log liên tục để phát hiện tấn công và sinh Cảnh báo (Alerts).
+    Tối ưu: một truy vấn lấy pending alerts + bulk index/update (tránh N+1 search/update mỗi bucket).
     """
     logger.info("Correlation Engine started.")
     # Khởi tạo index alerts nếu chưa có
@@ -192,6 +286,7 @@ async def correlation_engine():
                         "event_type": {"type": "keyword"},
                         "status": {"type": "keyword"},
                         "severity": {"type": "keyword"},
+                        "related_logs": {"type": "integer"},
                         "message": {"type": "text"}
                     }
                 }
@@ -199,17 +294,23 @@ async def correlation_engine():
     except Exception as e:
         logger.warning(f"Could not create alert index: {e}")
 
+    script_related = (
+        "if (ctx._source.related_logs == null) { ctx._source.related_logs = 0; } "
+        "ctx._source.related_logs += params.count; "
+        "if (ctx._source.related_logs > 5) { ctx._source.severity = 'high'; }"
+    )
+
     while True:
         await asyncio.sleep(15)  # Chạy mỗi 15 giây
-        
+
         # Distributed lock: Chỉ cho phép 1 worker thực thi Correlation trong mỗi chu kỳ 15s
         lock_acquired = redis_client.set("correlation_lock", "locked", nx=True, ex=14)
         if not lock_acquired:
             continue
-            
+
         try:
             now = datetime.utcnow()
-            
+
             # Lấy mốc thời gian đã xử lý từ Redis để không sót log hoặc overlap
             last_time_str = redis_client.get("correlation_last_time")
             if last_time_str:
@@ -219,34 +320,36 @@ async def correlation_engine():
                     time_from_dt = now - timedelta(seconds=60)
             else:
                 time_from_dt = now - timedelta(seconds=60)
-            
-            # time_to luôn trễ hơn hiện tại 45s để đảm bảo ES đã hoàn tất refresh (refresh_interval=30s)
-            time_to_dt = now - timedelta(seconds=45)
-            
+
+            # time_to lùi một chút so với "now" để log đã qua Redis→Logstash→bulk ES và refresh (template 1s)
+            # + batch collector (mặc định ~5s). Giảm từ 45s xuống ~12s để alert/dashboard test nguồn thật không phải chờ lâu.
+            time_to_dt = now - timedelta(seconds=12)
+
             # Giới hạn window tối đa là 120s để tránh query quá lớn nếu API bị tắt lâu
             if (time_to_dt - time_from_dt).total_seconds() > 120:
                 time_from_dt = time_to_dt - timedelta(seconds=120)
-                
+
             if time_from_dt >= time_to_dt:
                 continue
-                
+
             time_from = time_from_dt.strftime('%Y-%m-%dT%H:%M:%SZ')
             time_to = time_to_dt.strftime('%Y-%m-%dT%H:%M:%SZ')
-            
-            # Cập nhật mốc thời gian cho lần chạy tiếp theo
-            redis_client.set("correlation_last_time", time_to_dt.isoformat())
-            
+
+            # Truy vấn gom nhóm — filter context (không scoring), bool rõ ràng
             query = {
                 "query": {
                     "bool": {
-                        "must": [
+                        "filter": [
                             {"range": {"timestamp": {"gte": time_from, "lt": time_to}}},
-                            {"bool": {
-                                "should": [
-                                    {"term": {"is_attack": True}},
-                                    {"range": {"severity": {"gte": 4}}}
-                                ]
-                            }}
+                            {
+                                "bool": {
+                                    "minimum_should_match": 1,
+                                    "should": [
+                                        {"term": {"is_attack": True}},
+                                        {"range": {"severity": {"gte": 4}}},
+                                    ],
+                                }
+                            },
                         ]
                     }
                 },
@@ -260,57 +363,94 @@ async def correlation_engine():
                         }
                     }
                 },
-                "size": 0
+                "size": 0,
+                "track_total_hits": False,
             }
-            
-            # Sử dụng asyncio.to_thread để không block event loop của FastAPI
-            result = await asyncio.to_thread(es_client.search, index=ES_INDEX_PATTERN, body=query, ignore_unavailable=True)
+
+            result = await asyncio.to_thread(
+                es_client.search, index=ES_INDEX_PATTERN, body=query, ignore_unavailable=True
+            )
             aggs = result.get("aggregations", {}).get("by_ip", {}).get("buckets", [])
-            
+
+            candidates = []
             for ip_bucket in aggs:
                 src_ip = ip_bucket["key"]
                 for event_bucket in ip_bucket.get("by_event", {}).get("buckets", []):
                     event_type = event_bucket["key"]
                     count = event_bucket["doc_count"]
-                    
-                    # Rule: Nếu có >= 3 logs hoặc là loại sự kiện nguy hiểm
-                    if count >= 3 or event_type in ["ids_alert", "malware_detected", "dos_attack"]:
-                        # Kiểm tra xem có cảnh báo đang pending không
-                        pending_query = {
-                            "query": {
-                                "bool": {
-                                    "must": [
-                                        {"term": {"src_ip": src_ip}},
-                                        {"term": {"event_type": event_type}},
-                                        {"term": {"status": "pending"}}
-                                    ]
-                                }
-                            }
-                        }
-                        existing = await asyncio.to_thread(es_client.search, index=ES_ALERT_INDEX, body=pending_query, ignore_unavailable=True)
-                        if existing.get("hits", {}).get("total", {}).get("value", 0) > 0:
-                            # Cập nhật số lượng log liên quan
-                            alert_id = existing["hits"]["hits"][0]["_id"]
-                            await asyncio.to_thread(
-                                es_client.update,
-                                index=ES_ALERT_INDEX, 
-                                id=alert_id, 
-                                body={"script": {
-                                    "source": "ctx._source.related_logs += params.count; if (ctx._source.related_logs > 5) { ctx._source.severity = 'high' }",
-                                    "params": {"count": count}
-                                }}
-                            )
-                        else:
-                            alert_doc = {
-                                "timestamp": now.strftime('%Y-%m-%dT%H:%M:%SZ'),
-                                "src_ip": src_ip,
-                                "event_type": event_type,
-                                "related_logs": count,
-                                "status": "pending",
-                                "severity": "high" if count > 5 else "medium",
-                                "message": f"Phát hiện {count} sự kiện {event_type} từ {src_ip}"
-                            }
-                            await asyncio.to_thread(es_client.index, index=ES_ALERT_INDEX, body=alert_doc)
+                    if count >= 3 or event_type in ("ids_alert", "malware_detected", "dos_attack"):
+                        candidates.append((src_ip, event_type, count))
+
+            if not candidates:
+                redis_client.set("correlation_last_time", time_to_dt.isoformat())
+                continue
+
+            # Một lần lấy pending alerts (tránh N+1 theo từng cặp IP/event)
+            pending_result = await asyncio.to_thread(
+                es_client.search,
+                index=ES_ALERT_INDEX,
+                body={
+                    "query": {"term": {"status": "pending"}},
+                    "size": 500,
+                    "_source": ["src_ip", "event_type", "related_logs"],
+                },
+                ignore_unavailable=True,
+            )
+            pending_map = {}
+            for hit in pending_result.get("hits", {}).get("hits", []):
+                src = hit.get("_source", {}).get("src_ip")
+                ev = hit.get("_source", {}).get("event_type")
+                pending_map[(str(src), str(ev))] = hit["_id"]
+
+            bulk_actions = []
+            new_alerts = []  # Track alert mới để gửi Telegram
+            ts_alert = now.strftime('%Y-%m-%dT%H:%M:%SZ')
+            for src_ip, event_type, count in candidates:
+                key = (str(src_ip), str(event_type))
+                if key in pending_map:
+                    bulk_actions.append({
+                        "_op_type": "update",
+                        "_index": ES_ALERT_INDEX,
+                        "_id": pending_map[key],
+                        "retry_on_conflict": 2,
+                        "script": {"source": script_related, "params": {"count": count}},
+                    })
+                else:
+                    severity = "high" if count > 5 else "medium"
+                    bulk_actions.append({
+                        "_op_type": "index",
+                        "_index": ES_ALERT_INDEX,
+                        "_source": {
+                            "timestamp": ts_alert,
+                            "src_ip": src_ip,
+                            "event_type": event_type,
+                            "related_logs": count,
+                            "status": "pending",
+                            "severity": severity,
+                            "message": f"Phát hiện {count} sự kiện {event_type} từ {src_ip}",
+                        },
+                    })
+                    # Ghi nhớ alert mới để thông báo Telegram sau khi bulk index
+                    new_alerts.append((src_ip, event_type, count, severity))
+
+            if bulk_actions:
+                await asyncio.to_thread(
+                    bulk,
+                    es_client,
+                    bulk_actions,
+                    raise_on_error=False,
+                    request_timeout=60,
+                )
+
+                # Gửi Telegram notification cho alert mới (non-blocking, lỗi không ảnh hưởng flow)
+                for src_ip, event_type, count, severity in new_alerts:
+                    try:
+                        await _notify_new_alert(src_ip, event_type, count, severity)
+                    except Exception as tg_err:
+                        logger.warning(f"Telegram notify error: {tg_err}")
+
+            # Chỉ tăng mốc thời gian sau khi xử lý xong để tránh sót log khi lỗi giữa chừng
+            redis_client.set("correlation_last_time", time_to_dt.isoformat())
         except Exception as e:
             logger.error(f"Correlation engine error: {e}")
 
@@ -449,13 +589,15 @@ async def search_logs(
 
         offset = (page - 1) * size
 
-        result = es_client.search(
+        result = await asyncio.to_thread(
+            es_client.search,
             index=ES_INDEX_PATTERN,
             body={
                 "query": query_body,
                 "sort": [{sort_by: {"order": sort_order, "unmapped_type": "date"}}],
                 "from": offset,
                 "size": size,
+                "track_total_hits": 10000,
             },
             ignore_unavailable=True,
         )
@@ -516,6 +658,7 @@ async def get_attack_statistics(
 
         body = {
             "size": 0,
+            "track_total_hits": False,
             "query": base_query,
             "aggs": {
                 # Tổng số log
@@ -597,7 +740,8 @@ async def get_attack_statistics(
             },
         }
 
-        result = es_client.search(
+        result = await asyncio.to_thread(
+            es_client.search,
             index=ES_INDEX_PATTERN,
             body=body,
             ignore_unavailable=True,
@@ -661,12 +805,14 @@ async def get_recent_logs(
 ):
     """Lấy log gần nhất cho live feed trên dashboard."""
     try:
-        result = es_client.search(
+        result = await asyncio.to_thread(
+            es_client.search,
             index=ES_INDEX_PATTERN,
             body={
                 "query": {"match_all": {}},
                 "sort": [{"timestamp": {"order": "desc", "unmapped_type": "date"}}],
                 "size": limit,
+                "track_total_hits": False,
             },
             ignore_unavailable=True,
         )
@@ -696,12 +842,14 @@ async def get_alerts(
         if status:
             query_body = {"term": {"status": status}}
 
-        result = es_client.search(
+        result = await asyncio.to_thread(
+            es_client.search,
             index=ES_ALERT_INDEX,
             body={
                 "query": query_body,
                 "sort": [{"timestamp": {"order": "desc"}}],
                 "size": size,
+                "track_total_hits": False,
             },
             ignore_unavailable=True,
         )
@@ -722,15 +870,39 @@ async def get_alerts(
 async def update_alert_status(alert_id: str, update: AlertUpdate):
     """Cập nhật trạng thái của một cảnh báo."""
     try:
-        es_client.update(
+        await asyncio.to_thread(
+            es_client.update,
             index=ES_ALERT_INDEX,
             id=alert_id,
-            body={"doc": {"status": update.status}}
+            body={"doc": {"status": update.status}},
+            refresh=True
         )
         return {"status": "success", "message": f"Đã cập nhật trạng thái thành {update.status}"}
     except Exception as e:
         logger.error(f"Alert update error: {e}")
         raise HTTPException(status_code=500, detail=f"Lỗi cập nhật cảnh báo: {str(e)}")
+
+
+# ─── 4.7. Telegram Toggle ───
+
+@app.get("/telegram/status", tags=["Telegram"])
+async def get_telegram_status():
+    """Lấy trạng thái bật/tắt của Telegram notification."""
+    return {"status": "success", "enabled": _is_telegram_enabled()}
+
+
+@app.patch("/telegram/toggle", tags=["Telegram"])
+async def toggle_telegram(toggle: TelegramToggle):
+    """
+    Bật hoặc tắt Telegram notification.
+    Hữu ích khi stress test (tắt) hoặc kiểm tra alert (bật).
+    """
+    try:
+        redis_client.set(TELEGRAM_ENABLED_KEY, "true" if toggle.enabled else "false")
+        state_str = "BẬT" if toggle.enabled else "TẮT"
+        return {"status": "success", "message": f"Telegram notification đã {state_str}", "enabled": toggle.enabled}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi cập nhật: {str(e)}")
 
 
 # ─── 5. Health Check ───
@@ -805,7 +977,7 @@ async def get_metrics():
 async def root():
     return {
         "name": "Mini SIEM API",
-        "version": "1.0.0",
+        "version": "1.2.0",
         "description": "Security Log Aggregation System",
         "endpoints": {
             "POST /ingest": "Nhận single log entry",
@@ -815,6 +987,8 @@ async def root():
             "GET /recent": "Log gần nhất (live feed)",
             "GET /alerts": "Lấy danh sách cảnh báo (Alerts)",
             "PATCH /alerts/{id}": "Cập nhật trạng thái cảnh báo",
+            "GET /telegram/status": "Lấy trạng thái Telegram notification",
+            "PATCH /telegram/toggle": "Bật/tắt Telegram notification",
             "GET /health": "Health check",
             "GET /metrics": "Performance metrics",
             "GET /docs": "API documentation (Swagger)",

@@ -6,7 +6,9 @@ Cài đặt:
     pip install pywin32 requests
 
 
-Chạy với quyền Administrator:     cd /d G:\mini-siem
+Chạy với quyền Administrator:     
+cd /d G:\mini-siem (đường dẫn đến thư mục mini-siem)
+
     python scripts/win_event_agent.py
 """
 

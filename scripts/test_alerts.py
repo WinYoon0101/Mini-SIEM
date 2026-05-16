@@ -1,8 +1,14 @@
 # python scripts/test_alerts.py
 
+import sys
+import codecs
 import requests
 import time
-from datetime import datetime
+from datetime import datetime, timezone
+
+# Fix unicode error in windows powershell
+if sys.platform == "win32":
+    sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
 
 API_URL = "http://localhost:8000"
 
@@ -13,7 +19,7 @@ def send_log(event_type, src_ip, severity=3, message="Test log"):
         "src_ip": src_ip,
         "severity": severity,
         "message": message,
-        "timestamp": datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+        "timestamp": datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
     }
     try:
         res = requests.post(f"{API_URL}/ingest", json=log, timeout=5)
@@ -60,9 +66,9 @@ def run_test():
     send_log(event_2, ip_2, 5, "SQL Injection payload detected in URI")
     
     print("\n⏳ Đã gửi xong log. Đang chờ xử lý...")
-    print("   - Pipeline cần thời gian: Redis -> Logstash -> Elasticsearch (Refresh 30s)")
-    print("   - Correlation Engine có cửa sổ quét lùi 45s để đảm bảo không sót log.")
-    print("   => Vui lòng đợi từ 60-80 giây...\n")
+    print("   - Pipeline: Redis -> Logstash -> Elasticsearch (refresh ~1s trên index template)")
+    print("   - Correlation lùi ~12s so với hiện tại + chu kỳ 15s — đủ cho log nguồn thật vào cửa sổ quét.")
+    print("   => Thường 25-45 giây là đủ; tối đa chờ 90s nếu tải chậm.\n")
     
     wait_time = 0
     max_wait = 90
