@@ -389,16 +389,41 @@ th {
     color: #facc15;
 }
 
-/* Logs */
+
+/* =========================
+   Logs
+========================= */
+
 .log-entry {
-    display: flex;
+    display: grid;
+
+    grid-template-columns:
+        170px   /* time */
+        220px   /* event */
+        160px   /* ip */
+        70px    /* severity */
+        1fr;    /* message */
+
     align-items: center;
-    gap: 15px;
-    padding: 12px 15px;
+
+    gap: 18px;
+
+    padding: 14px 18px;
+
     border-bottom: 1px solid var(--border);
-    font-size: 0.85rem;
+
     background: var(--card);
+
+    font-size: 0.9rem;
+
+    transition: background 0.2s ease;
 }
+
+.log-entry:hover {
+    background: rgba(255,255,255,0.03);
+}
+
+/* Attack / Normal */
 
 .log-entry.attack {
     border-left: 3px solid var(--danger);
@@ -408,30 +433,81 @@ th {
     border-left: 3px solid var(--success);
 }
 
+/* Time */
+
 .log-time {
     color: var(--muted);
-    width: 150px;
+
     font-family: monospace;
-    font-size: 0.8rem;
+
+    white-space: nowrap;
 }
+
+/* Event */
 
 .log-event {
     font-weight: 600;
-    width: 120px;
+
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
+
+/* IP */
 
 .log-ip {
     font-family: monospace;
-    width: 120px;
-    color: var(--primary);
-}
 
-.log-msg {
-    flex: 1;
-    white-space: nowrap;
+    color: var(--primary);
+
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Message */
+
+.log-msg {
     color: var(--muted);
+
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Severity */
+
+.severity-badge {
+    width: 34px;
+    height: 34px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 8px;
+
+    font-weight: 700;
+
+    font-size: 0.85rem;
+}
+
+/* Responsive */
+
+#livefeed-stream {
+    overflow-x: auto;
+}
+
+@media (max-width: 900px) {
+    .log-entry {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .log-msg {
+        white-space: normal;
+        word-break: break-word;
+    }
 }
 
 /* System */
@@ -522,12 +598,6 @@ th {
 
     .menu-toggle {
         display: block;
-    }
-
-    .log-entry {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 5px;
     }
 }
 
