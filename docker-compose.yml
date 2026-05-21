@@ -18,7 +18,7 @@ services:
         condition: service_healthy
     restart: "no"
 
-  # 1. Database lưu trữ - Elasticsearch
+  # 1. Elasticsearch
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:7.17.10
     environment:
@@ -35,18 +35,7 @@ services:
       timeout: 10s
       retries: 5
 
-  # 2. Giao diện quản lý - Kibana
-  kibana:
-    image: docker.elastic.co/kibana/kibana:7.17.10
-    ports:
-      - "5601:5601"
-    depends_on:
-      elasticsearch:
-        condition: service_healthy
-      es-bootstrap:
-        condition: service_completed_successfully
-
-  # 3. Message Queue - Redis
+  # 2. Redis
   redis:
     image: redis:latest
     ports:
@@ -57,27 +46,27 @@ services:
       timeout: 3s
       retries: 3
 
-  # 4. Bộ xử lý log - Logstash
+  # 3. Logstash
   logstash:
     image: docker.elastic.co/logstash/logstash:7.17.10
     environment:
-      - PIPELINE_WORKERS=4
-      - PIPELINE_BATCH_SIZE=2000
+      - PIPELINE_WORKERS=2
+      - PIPELINE_BATCH_SIZE=1000
       - PIPELINE_BATCH_DELAY=50
     volumes:
       - ./logstash/pipeline:/usr/share/logstash/pipeline
     depends_on:
       elasticsearch:
         condition: service_healthy
-      es-bootstrap:
-        condition: service_completed_successfully
       redis:
         condition: service_healthy
+      es-bootstrap:
+        condition: service_completed_successfully
 
-  # 5. API nhận & truy vấn log
+  # 4. API Collector
   api-collector:
     build: ./api
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --workers 2
     ports:
       - "8000:8000"
     depends_on:
@@ -89,7 +78,7 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
-  # 6. Dashboard visualization
+  # 5. Custom Dashboard
   dashboard:
     build: ./dashboard
     ports:
@@ -102,8 +91,7 @@ services:
       - api-collector
     restart: unless-stopped
 
-  # 7. Web Server thực - Nginx (sinh access log thật)
-  #    Truy cập: http://localhost:8080
+  # 6. Target Nginx
   nginx-target:
     image: nginx:alpine
     ports:
@@ -116,9 +104,16 @@ services:
       - nginx_logs:/var/log/nginx
     restart: unless-stopped
 
-  # 8. ModSecurity WAF - Tường lửa/IDS thực (OWASP CRS)
-  #    Truy cập qua WAF: http://localhost:8443
-  #    Thử tấn công:     curl "http://localhost:8443/?id=1 UNION SELECT *"
+  # 6b. Khởi tạo volume audit log (tránh lần đầu root:root 755 khiến nginx không ghi được)
+  modsec-log-init:
+    image: busybox:1.36
+    entrypoint: ["/bin/sh", "/init/modsec-log-init.sh"]
+    volumes:
+      - modsec_logs:/var/log/modsec
+      - ./log_sources/modsec-log-init.sh:/init/modsec-log-init.sh:ro
+    restart: "no"
+
+  # 7. ModSecurity WAF
   modsecurity-waf:
     image: owasp/modsecurity-crs:nginx-alpine
     ports:
@@ -129,24 +124,29 @@ services:
       - MODSEC_AUDIT_LOG=/var/log/modsec/audit.log
       - MODSEC_AUDIT_LOG_FORMAT=JSON
       - MODSEC_AUDIT_LOG_TYPE=Serial
+      - MODSEC_AUDIT_LOG_RELEVANT_STATUS=^(?:5|4(?!04))
       - PORT=8080
       - MODSEC_RULE_ENGINE=On
     volumes:
       - modsec_logs:/var/log/modsec
+      - ./log_sources/modsecurity-override.conf:/etc/modsecurity.d/owasp-crs/rules/REQUEST-005-AUDIT-LOGGING.conf:ro
       - ./log_sources/99-fix-perms.sh:/docker-entrypoint.d/99-fix-perms.sh:ro
     depends_on:
-      - nginx-target
+      modsec-log-init:
+        condition: service_completed_successfully
+      nginx-target:
+        condition: service_started
     restart: unless-stopped
 
-  # 9. Log Collector - Parse log từ Nginx & ModSecurity → gửi SIEM API
+  # 8. Log Collector
   log-collector:
     build: ./log_sources
     environment:
       - API_URL=http://api-collector:8000
       - BATCH_INTERVAL=5
     volumes:
-      - nginx_logs:/var/log/nginx:ro       # đọc Nginx log (readonly)
-      - modsec_logs:/var/log/modsec:ro     # đọc ModSecurity log (readonly)
+      - nginx_logs:/var/log/nginx:ro
+      - modsec_logs:/var/log/modsec:ro
     depends_on:
       - api-collector
       - nginx-target
@@ -156,7 +156,9 @@ services:
 volumes:
   es_data:
     driver: local
-  nginx_logs:       # Shared volume: Nginx ghi → Collector đọc
+
+  nginx_logs:
     driver: local
-  modsec_logs:      # Shared volume: ModSecurity ghi → Collector đọc
+
+  modsec_logs:
     driver: local

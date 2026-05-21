@@ -32,7 +32,7 @@ logger = logging.getLogger("win-event-agent")
 
 # ─── Config ───────────────────────────────────────────────────────
 API_URL        = "http://localhost:8000"
-BATCH_INTERVAL = 10          # giây
+BATCH_INTERVAL = 1          # giây
 LOG_TYPE       = "Security"
 SERVER         = None        # None = local machine
 

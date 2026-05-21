@@ -45,17 +45,17 @@ Nhấn vào **"Chế độ kiểm thử"** ở Footer hoặc dùng phím tắt `
 
 ## 3. ModSecurity WAF - Tường lửa thực (Port 8443) 🛡️
 
-Đây là hệ thống bảo vệ thực tế. WAF sẽ thực sự phân tích và chặn các payload nguy hiểm trước khi chúng tới được web server.
+Đây là hệ thống bảo vệ thực tế. WAF sẽ thực sự phân tích và chặn các payload nguy hiểm trước khi chúng tới được web server. Service `modsec-log-init` tự tạo `/var/log/modsec/audit.log` với quyền ghi trước khi WAF khởi động.
 
 - **Cách test:** Sử dụng `curl` để gửi các payload tấn công thực tế vào cổng `8443`.
 
 | Loại tấn công | Tên kỹ thuật | Lệnh thực thi (Payload thực) |
-|---------------|--------------|-----------------------------|
-| **SQL Injection** | Tấn công DB | `curl "http://localhost:8443/?id=1' UNION SELECT 1,2,3--"` |
-| **Cross-Site Scripting** | Chèn Script độc | `curl "http://localhost:8443/?q=<script>alert('XSS')</script>"` |
-| **Path Traversal** | Truy cập file hệ thống | `curl "http://localhost:8443/?file=../../etc/passwd"` |
-| **Remote Code Execution** | Chạy lệnh hệ thống | `curl "http://localhost:8443/?exec=/bin/bash"` |
-| **Scanner Detection** | Phát hiện tool quét | `curl -A "Nikto" http://localhost:8443/` |
+|---|---|---|
+| **SQL Injection** | Tấn công DB | `curl.exe "http://localhost:8443/?id=1%27%20UNION%20SELECT%201,2,3--"` |
+| **Cross-Site Scripting (XSS)** | Chèn script độc | `curl.exe "http://localhost:8443/?q=%3Cscript%3Ealert('XSS')%3C/script%3E"` |
+| **Path Traversal** | Truy cập file hệ thống | `curl.exe "http://localhost:8443/?file=..%2F..%2Fetc%2Fpasswd"` |
+| **Remote Code Execution (RCE)** | Payload thực thi lệnh | `curl.exe "http://localhost:8443/?exec=%2Fbin%2Fbash"` |
+| **Scanner Detection** | Phát hiện công cụ quét | `curl.exe -A "Nikto" "http://localhost:8443/"` |
 
 - **Kết quả mong đợi:** Nhận về lỗi **403 Forbidden**. Trên Dashboard xuất hiện log `firewall_block` hoặc `ids_alert` với mức độ **High/Critical**.
 

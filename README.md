@@ -38,10 +38,7 @@ curl http://localhost:8080/
 
 curl "http://localhost:8080/search?q=laptop"
 
-# 4. Thử tấn công qua WAF để sinh IDS/Firewall alert
-# Tạp file chứa log
-docker exec -u 0 mini-siem-modsecurity-waf-1 sh -c "mkdir -p /var/log/modsec && touch /var/log/modsec/audit.log && chmod -R 777 /var/log/modsec"
-
+# 4. Thử tấn công qua WAF để sinh IDS/Firewall alert (audit log tự khởi tạo qua modsec-log-init)
 curl "http://localhost:8443/?id=1%20UNION%20SELECT%20*"
 curl "http://localhost:8443/?search=<script>alert(1)</script>"
 

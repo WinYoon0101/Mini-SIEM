@@ -69,8 +69,7 @@ Bảng dưới đây map trực tiếp **Đặc tả yêu cầu & đánh giá b�
         └──────────────────►│─────────────────►│───────────────────►│─────────────────►│
                               │                  │                    │                  │
  Dashboard (Nginx :3000) ◄───┴── GET /search, /stats, /recent ──────┴──────────────────┘
-        │
-        └── (tùy chọn) Kibana :5601 — truy vấn trực tiếp index `siem-logs-*`
+
 ```
 
 **Các thành phần:**
