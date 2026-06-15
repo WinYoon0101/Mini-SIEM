@@ -2,7 +2,7 @@
 
 Hệ thống thu thập, phân tích và trực quan hóa log bảo mật từ nhiều nguồn **thực tế**.
 
-**Tài liệu thiết kế:** [docs/THIET_KE_HE_THONG.md](docs/THIET_KE_HE_THONG.md) | **Chiến lược Indexing:** [docs/CHIEN_LUOC_INDEXING.md](docs/CHIEN_LUOC_INDEXING.md)
+**Tài liệu thiết kế:** [docs/THIET_KE_HE_THONG.md](docs/THIET_KE_HE_THONG.md) | 
 
 ## 🏗️ Kiến trúc
 
