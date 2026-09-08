@@ -2,18 +2,18 @@
 
 Hệ thống thu thập, phân tích và trực quan hóa log bảo mật từ nhiều nguồn **thực tế**.
 
-**Tài liệu thiết kế:** [docs/THIET_KE_HE_THONG.md](docs/THIET_KE_HE_THONG.md) | **Chiến lược Indexing:** [docs/CHIEN_LUOC_INDEXING.md](docs/CHIEN_LUOC_INDEXING.md)
+**Tài liệu thiết kế:** [docs/THIET_KE_HE_THONG.md](docs/THIET_KE_HE_THONG.md) | 
 
 ## 🏗️ Kiến trúc
 
 ```
- NGUỒN LOG THỰC TẾ                 PIPELINE XỬ LÝ              LƯU TRỮ & HIỂN THỊ
+NGUỒN LOG THỰC TẾ                 PIPELINE XỬ LÝ              LƯU TRỮ & HIỂN THỊ
  ─────────────────                 ───────────────              ──────────────────
  [Nginx :8080]  ──┐                                            ┌─ Elasticsearch
  [ModSec WAF]   ──┤──► [log-collector] ──► POST /ingest ──────►│   (Port 9200)
  (Port :8443)   ──┘                              │             └──► Dashboard :3000
-                                         [API Collector]
- [Windows Host]                           (FastAPI :8000)
+                                         [API Collector] ◄──── [MCP Server] ◄── [AI Agents]
+ [Windows Host]                           (FastAPI :8000)       (Node.js)
  win_event_agent ────────────────────────────────┘
                                                  │
                                           [Redis Queue]
@@ -83,6 +83,14 @@ python scripts/win_event_agent.py
 - **Search**: Tìm kiếm với nhiều bộ lọc + pagination
 - **Live Feed**: Real-time log stream (5s polling)
 
+## AI-Agentic Workflow (Model Context Protocol)
+
+Hệ thống được thiết kế theo tư duy **AI-ready**, cho phép các AI IDEs kết nối trực tiếp vào luồng dữ liệu SIEM để tự động chẩn đoán lỗi bảo mật:
+
+- **MCP Server độc lập:** Phơi bày các API (Health, Search, Stats) thành các Tools cho AI.
+- **Tương tác qua STDIO:** AI tự động truy xuất Elasticsearch và chẩn đoán nguyên nhân tấn công ngay trong IDE mà không cần mở Dashboard.
+- **Cách sử dụng:** Cấu hình `mcp-server/server.js` vào file config của Claude Desktop hoặc Cursor IDE.
+
 ## 🧪 Testing
 
 Xem chi tiết tại [TEST_GUIDE.md](TEST_GUIDE.md)
@@ -102,6 +110,9 @@ mini-siem/
 ├── docs/
 │   ├── THIET_KE_HE_THONG.md
 │   └── CHIEN_LUOC_INDEXING.md
+├── mcp-server/                   
+│   ├── package.json
+│   └── server.js
 ├── elasticsearch/
 │   └── index-templates/
 │       └── siem-logs-template.json
@@ -142,3 +153,4 @@ mini-siem/
 - **Web Server**: Nginx Alpine (nguồn log thực — port 8080)
 - **WAF/IDS**: OWASP ModSecurity CRS (nguồn log thực — port 8443)
 - **Endpoint**: Windows Event Log via pywin32 (nguồn log thực — host)
+- **AI Integration**: Node.js + `@modelcontextprotocol/sdk`
