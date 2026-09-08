@@ -28,3 +28,7 @@ elasticsearch/data/
 
 # Logs
 *.log
+
+# Node.js (dành cho thư mục mcp-server)
+node_modules/
+package-lock.json 
